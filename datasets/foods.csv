@@ -1,0 +1,31 @@
+food_id,food_name,cuisine,category,calories,protein,carbs,fats,spice_level,veg_nonveg,price,meal_type,image_url,description
+f1,Paneer Tikka,Indian,Lunch,320,18,10,22,High,Veg,280,Heavy,paneer_tikka.jpg,Spicy grilled paneer cubes marinated in yogurt and Indian spices. High in protein.
+f2,Butter Chicken,Indian,Dinner,480,28,12,35,Medium,Non-Veg,380,Heavy,butter_chicken.jpg,Tender chicken pieces cooked in a creamy tomato-based spiced gravy. Ultimate comfort food.
+f3,Margherita Pizza,Italian,Dinner,350,14,42,13,Low,Veg,320,Heavy,margherita_pizza.jpg,Classic Italian pizza with simple fresh tomato sauce, mozzarella cheese, and fresh basil leaves.
+f4,Chicken Alfredo Pasta,Italian,Dinner,550,26,48,25,Low,Non-Veg,360,Heavy,chicken_alfredo.jpg,Rich and creamy fettuccine pasta tossed in buttery Alfredo sauce and topped with grilled chicken.
+f5,Veg Schezwan Noodles,Chinese,Lunch,380,8,65,10,High,Veg,220,Heavy,schezwan_noodles.jpg,Spicy stir-fried noodles tossed with crunchy vegetables and fiery Schezwan sauce.
+f6,Sushi Combo,Japanese,Dinner,420,22,60,8,Low,Non-Veg,450,Light,sushi_combo.jpg,Assorted fresh sushi rolls featuring tuna, salmon, and avocado. Healthy and clean protein.
+f7,Tofu Veg Stir-Fry,Chinese,Lunch,250,15,20,12,Medium,Veg,240,Light,tofu_stir_fry.jpg,Crispy tofu tossed with broccoli, bell peppers, and carrots in a savory ginger-soy glaze. Great vegan option.
+f8,Caesar Salad with Chicken,American,Lunch,340,24,12,18,Low,Non-Veg,290,Light,chicken_caesar.jpg,Fresh romaine lettuce, parmesan cheese, and croutons topped with grilled chicken and creamy Caesar dressing. Great for weight loss.
+f9,Oatmeal with Berries,American,Breakfast,210,6,38,3,Low,Veg,150,Light,oatmeal_berries.jpg,Warm rolled oats cooked in almond milk, topped with fresh strawberries, blueberries, and a drizzle of honey.
+f10,Avocado Toast with Eggs,American,Breakfast,310,12,24,18,Low,Veg,180,Light,avocado_toast.jpg,Toasted sourdough bread topped with mashed seasoned avocado and two soft-poached eggs. Healthy fats and protein.
+f11,Greek Salad,Italian,Lunch,220,5,10,18,Low,Veg,220,Light,greek_salad.jpg,Crisp cucumbers, tomatoes, red onions, kalamata olives, and feta cheese tossed in Greek dressing.
+f12,Taco Fiesta,Mexican,Dinner,410,18,35,16,Medium,Non-Veg,260,Heavy,taco_fiesta.jpg,Three crispy corn tortillas stuffed with seasoned minced beef, lettuce, cheese, and fresh tomato salsa.
+f13,Chana Masala,Indian,Lunch,280,12,45,6,Medium,Veg,180,Heavy,chana_masala.jpg,Flavorful chickpea curry simmered in a spiced tomato-onion gravy. High in fiber and plant protein.
+f14,Paneer Butter Masala,Indian,Dinner,450,16,14,36,Medium,Veg,290,Heavy,paneer_butter.jpg,Rich and creamy cottage cheese curry cooked in a tomato, butter, and cashew paste base.
+f15,Masala Dosa,Indian,Breakfast,320,6,54,8,Medium,Veg,120,Light,masala_dosa.jpg,Crispy thin crepe made of fermented rice-lentil batter, stuffed with a spiced potato mash, served with coconut chutney.
+f16,Dal Tadka & Rice,Indian,Lunch,340,10,58,5,Medium,Veg,140,Heavy,dal_tadka.jpg,Comforting yellow lentil soup tempered with ghee, garlic, and cumin, served alongside steamed basmati rice.
+f17,Beef Burger & Fries,American,Dinner,680,32,70,30,Low,Non-Veg,350,Heavy,burger_fries.jpg,Juicy grilled beef patty with cheese, lettuce, and pickles in a brioche bun, served with gold french fries.
+f18,Veggie Quesadilla,Mexican,Snacks,290,10,32,12,Medium,Veg,190,Light,veggie_quesadilla.jpg,Toasted flour tortilla stuffed with melted jack cheese, sweet corn, black beans, and bell peppers.
+f19,Grilled Salmon with Asparagus,American,Dinner,460,36,8,30,Low,Non-Veg,490,Light,grilled_salmon.jpg,Pan-seared salmon fillet seasoned with lemon herb butter, served with tender grilled asparagus. Ideal for muscle gain.
+f20,Miso Soup,Japanese,Breakfast,90,4,8,2,Low,Veg,110,Light,miso_soup.jpg,Traditional Japanese soup with dashi stock, miso paste, tofu cubes, and seaweed. Extremely light and comforting.
+f21,Chicken Ramen,Japanese,Dinner,540,28,62,16,Medium,Non-Veg,380,Heavy,chicken_ramen.jpg,Rich chicken broth noodles topped with sliced grilled chicken, soft boiled egg, green onions, and bamboo shoots.
+f22,Chicken Quesadilla,Mexican,Snacks,420,24,30,18,Medium,Non-Veg,240,Light,chicken_quesadilla.jpg,Warm folded flour tortilla filled with melted cheese, spicy pulled chicken, and sauteed peppers.
+f23,Fruit Smoothie Bowl,American,Breakfast,240,5,48,4,Low,Veg,200,Light,smoothie_bowl.jpg,Thick blended banana and berry smoothie base topped with chia seeds, sliced bananas, granola, and honey.
+f24,Chocolate Pancake Stack,American,Breakfast,480,8,80,12,Low,Veg,180,Heavy,chocolate_pancakes.jpg,Fluffy buttermilk pancakes stacked and drizzled with warm chocolate sauce and chocolate chips. Sweet comfort.
+f25,Quinoa Chickpea Salad,American,Lunch,290,10,40,8,Low,Veg,240,Light,quinoa_salad.jpg,Healthy salad of fluffy quinoa, chickpeas, cucumber, cherry tomatoes, and mint, in a zesty lemon dressing.
+f26,Chili Con Carne,Mexican,Dinner,510,30,42,20,High,Non-Veg,320,Heavy,chili_carne.jpg,Spicy and hearty stew of minced beef, kidney beans, chili peppers, and tomatoes. High protein and energizing.
+f27,Samosa,Indian,Snacks,190,3,24,10,High,Veg,40,Light,samosa.jpg,Crispy fried pastry triangles filled with a spiced potato and green peas mixture. Classic tea-time snack.
+f28,Garlic Bread,Italian,Snacks,220,5,28,10,Low,Veg,140,Light,garlic_bread.jpg,Toasted sliced baguette spread with garlic butter, fresh parsley, and melted mozzarella cheese.
+f29,Chicken Biryani,Indian,Dinner,590,32,68,18,High,Non-Veg,320,Heavy,chicken_biryani.jpg,Layered, aromatic basmati rice cooked with chicken, whole spices, and saffron. Rich, flavorful, and celebratory.
+f30,Steamed Veg Momos,Chinese,Snacks,160,4,32,1,Medium,Veg,130,Light,veg_momos.jpg,Delicate steamed dumplings stuffed with finely minced vegetables, served with a spicy sesame dipping sauce.

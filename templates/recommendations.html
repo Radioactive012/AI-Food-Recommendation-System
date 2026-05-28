@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}BiteWise - AI Food Suggestions{% endblock %}
+
+{% block page_title %}Your Top Recommendations{% endblock %}
+
+{% block content %}
+<div class="recommendations-wrapper">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+            <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem;">Tailored Just For You</h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">We computed matching vectors for your diet, spice level, health target, and mood.</p>
+        </div>
+        <a href="{{ url_for('index') }}" class="admin-btn edit" style="text-decoration: none; padding: 0.6rem 1rem;">
+            <i class="fa-solid fa-arrow-left"></i>
+            <span>Modify Preferences</span>
+        </a>
+    </div>
+
+    {% if suggestions %}
+        <div class="results-grid">
+            {% for item in suggestions %}
+                {% set food = item.food %}
+                {% set score = item.score %}
+                {% set explanation = item.explanation %}
+                
+                <div class="food-card">
+                    <!-- Veg/Non-Veg Badge -->
+                    <span class="food-badge {% if food.veg_nonveg == 'Veg' %}veg{% else %}non-veg{% endif %}">
+                        <i class="fa-solid {% if food.veg_nonveg == 'Veg' %}fa-leaf{% else %}fa-circle-dot{% endif %}"></i>
+                        {{ food.veg_nonveg }}
+                    </span>
+                    
+                    <!-- Food Card Image Mockup -->
+                    <div class="food-image-placeholder">
+                        <i class="fa-solid {% if food.cuisine == 'Italian' %}fa-pizza-slice{% elif food.cuisine == 'Chinese' %}fa-bowl-rice{% elif food.cuisine == 'Indian' %}fa-pepper-hot{% else %}fa-hamburger{% endif %}"></i>
+                        <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">{{ food.cuisine }} Cuisine</span>
+                        
+                        <!-- Recommendation Match Indicator -->
+                        <div class="score-tag">
+                            <i class="fa-solid fa-bolt"></i>
+                            <!-- Scoring mapping: scale maximum expected points (e.g. 15-20 points) to a percentage -->
+                            {% set pct = (((score + 5) / 25) * 100) | round | int %}
+                            {% set pct = 98 if pct > 98 else pct %}
+                            {% set pct = 60 if pct < 60 else pct %}
+                            <span>{{ pct }}% Match</span>
+                        </div>
+                    </div>
+                    
+                    <div class="food-details">
+                        <!-- Top Info -->
+                        <div class="food-info-top">
+                            <h3 class="food-name">{{ food.food_name }}</h3>
+                            <span class="food-price">₹{{ food.price | int }}</span>
+                        </div>
+                        
+                        <!-- Description -->
+                        <p class="food-desc">{{ food.description }}</p>
+                        
+                        <!-- Tags -->
+                        <div class="food-tags">
+                            <span class="tag cuisine-tag">{{ food.cuisine }}</span>
+                            <span class="tag spice-tag">{{ food.spice_level }} Spice</span>
+                            <span class="tag">{{ food.category }}</span>
+                            {% if food.meal_type %}
+                                <span class="tag" style="background-color: var(--primary-glow); color: var(--primary);">{{ food.meal_type }}</span>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Nutrients Breakdown -->
+                        <div class="nutrients-breakdown">
+                            <!-- Calories -->
+                            <div class="nutrient-row">
+                                <div class="nutrient-header">
+                                    <span class="nutrient-name">Energy (Calories)</span>
+                                    <span class="nutrient-val">{{ food.calories }} kcal</span>
+                                </div>
+                                <div class="nutrient-bar-bg">
+                                    {% set cal_pct = (food.calories / 800 * 100) | int %}
+                                    <div class="nutrient-bar-fill calories" style="width: {{ cal_pct }}%"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Protein -->
+                            <div class="nutrient-row">
+                                <div class="nutrient-header">
+                                    <span class="nutrient-name">Protein</span>
+                                    <span class="nutrient-val">{{ food.protein }}g</span>
+                                </div>
+                                <div class="nutrient-bar-bg">
+                                    {% set pro_pct = (food.protein / 50 * 100) | int %}
+                                    <div class="nutrient-bar-fill protein" style="width: {{ pro_pct }}%"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Carbs -->
+                            <div class="nutrient-row">
+                                <div class="nutrient-header">
+                                    <span class="nutrient-name">Carbohydrates</span>
+                                    <span class="nutrient-val">{{ food.carbs }}g</span>
+                                </div>
+                                <div class="nutrient-bar-bg">
+                                    {% set carb_pct = (food.carbs / 100 * 100) | int %}
+                                    <div class="nutrient-bar-fill carbs" style="width: {{ carb_pct }}%"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Fats -->
+                            <div class="nutrient-row">
+                                <div class="nutrient-header">
+                                    <span class="nutrient-name">Fats</span>
+                                    <span class="nutrient-val">{{ food.fats }}g</span>
+                                </div>
+                                <div class="nutrient-bar-bg">
+                                    {% set fat_pct = (food.fats / 50 * 100) | int %}
+                                    <div class="nutrient-bar-fill fats" style="width: {{ fat_pct }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- AI Explanation Box -->
+                        <div class="explanation-box">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>{{ explanation }}</span>
+                        </div>
+                        
+                        <!-- Ratings Form -->
+                        <div class="rating-action-box" style="margin-top: 0.5rem; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
+                            <form action="{{ url_for('submit_rating') }}" method="POST" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <input type="hidden" name="food_id" value="{{ food.food_id }}">
+                                <input type="hidden" class="rating-score-value" name="rating" value="5">
+                                
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span class="rating-title">Rate this recommendation:</span>
+                                    <div class="rating-stars">
+                                        <button type="button" class="rating-star-btn active"><i class="fa-solid fa-star"></i></button>
+                                        <button type="button" class="rating-star-btn active"><i class="fa-solid fa-star"></i></button>
+                                        <button type="button" class="rating-star-btn active"><i class="fa-solid fa-star"></i></button>
+                                        <button type="button" class="rating-star-btn active"><i class="fa-solid fa-star"></i></button>
+                                        <button type="button" class="rating-star-btn active"><i class="fa-solid fa-star"></i></button>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <input type="text" name="review" class="rating-comment-input" placeholder="Optional review (e.g. delicious, too salty)...">
+                                    <button type="submit" class="submit-rating-btn">Submit</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="glass-panel" style="text-align: center; padding: 4rem;">
+            <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; color: var(--accent); margin-bottom: 1.5rem;"></i>
+            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">No Matching Foods Found</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">We couldn't find foods satisfying your specific filters. Try loosening your price limit or changing your diet type.</p>
+            <a href="{{ url_for('index') }}" class="submit-btn" style="display: inline-flex; width: auto; padding: 0.75rem 1.5rem;">Adjust Settings</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

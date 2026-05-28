@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BiteWise - AI Food Recommendation{% endblock %}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <i class="fa-solid fa-wand-magic-sparkles brand-icon"></i>
+                <span class="brand-text">Bite<span>Wise</span></span>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <a href="{{ url_for('index') }}" class="menu-item {% if active_page == 'home' %}active{% endif %}">
+                    <i class="fa-solid fa-utensils"></i>
+                    <span>Recommendations</span>
+                </a>
+                <a href="{{ url_for('history') }}" class="menu-item {% if active_page == 'history' %}active{% endif %}">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>History</span>
+                </a>
+                <a href="{{ url_for('admin_dashboard') }}" class="menu-item {% if active_page == 'admin' %}active{% endif %}">
+                    <i class="fa-solid fa-lock"></i>
+                    <span>Admin Panel</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                {% if session.get('user_id') %}
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div class="user-details">
+                            <p class="user-name">{{ session.get('user_name') }}</p>
+                            <span class="user-role">User</span>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="logout-btn" title="Logout">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="login-nav-btn">
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        <span>Sign In</span>
+                    </a>
+                {% endif %}
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="main-header">
+                <div class="header-search">
+                    <!-- Dynamic Page Title -->
+                    <h1>{% block page_title %}Personalized Suggestions{% endblock %}</h1>
+                </div>
+                <div class="header-actions">
+                    <!-- Theme Toggle Placeholder -->
+                    <button class="theme-toggle" id="themeToggleBtn" title="Toggle Theme">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                    {% if session.get('user_id') %}
+                        <div class="user-badge">
+                            <i class="fa-solid fa-circle-user"></i>
+                            <span>{{ session.get('user_name') }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- Flash messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-messages">
+                            {% for category, message in messages %}
+                                <div class="flash-message {{ category }}">
+                                    <i class="fa-solid {% if category == 'success' %}fa-circle-check{% elif category == 'error' %}fa-circle-xmark{% else %}fa-circle-info{% endif %}"></i>
+                                    <span>{{ message }}</span>
+                                    <button class="close-flash" onclick="this.parentElement.remove()">&times;</button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Floating Chatbot Widget -->
+    <div class="chatbot-widget" id="chatbotWidget">
+        <button class="chatbot-trigger" id="chatbotTrigger" title="Ask BiteWise AI">
+            <i class="fa-solid fa-comment-dots"></i>
+            <span class="pulse-indicator"></span>
+        </button>
+        
+        <div class="chat-drawer" id="chatDrawer">
+            <div class="chat-header">
+                <div class="chat-bot-info">
+                    <i class="fa-solid fa-robot chat-bot-icon"></i>
+                    <div>
+                        <h4>BiteWise AI Assistant</h4>
+                        <span class="status-online">Online</span>
+                    </div>
+                </div>
+                <button class="chat-close" id="chatClose">&times;</button>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot">
+                    <div class="message-bubble">
+                        Hello! I am your AI assistant. Tell me what you're craving! 
+                        For example: <em>"I want a spicy, low calorie dinner under ₹300"</em>
+                    </div>
+                </div>
+            </div>
+            
+            <form class="chat-input-area" id="chatForm">
+                <input type="text" id="chatInput" placeholder="Describe your craving..." autocomplete="off" required>
+                <button type="submit" class="chat-send" id="chatSendBtn">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
