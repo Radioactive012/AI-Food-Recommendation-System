@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}BiteWise - Recommendation History{% endblock %}
+{% block title %}BiteWise — History{% endblock %}
 
-{% block page_title %}Your Suggestions History{% endblock %}
+{% block page_title %}History{% endblock %}
 
 {% block content %}
-<div class="glass-panel" style="padding: 2.5rem 1.5rem;">
-    <div style="margin-bottom: 2.5rem; text-align: center;">
-        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; font-family: 'Outfit';">Recommendations Timeline</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Review the history of foods suggest to you by our AI algorithms.</p>
+<div class="glass-panel" style="padding: 2rem 1.25rem;">
+    <div style="margin-bottom: 2rem; text-align: center;">
+        <h2 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.3rem; font-family: 'Outfit';">Your History</h2>
+        <p style="color: var(--text-secondary); font-size: 0.8rem;">Dishes you've explored recently.</p>
     </div>
     
     {% if history_items %}
@@ -16,21 +16,19 @@
             {% for item in history_items %}
                 <div class="timeline-item {% if loop.index0 % 2 == 0 %}left-item{% else %}right-item{% endif %}">
                     <div class="timeline-content">
-                        <!-- Date & Time -->
                         <span class="timeline-time">
-                            <i class="fa-solid fa-calendar-day" style="margin-right: 0.25rem;"></i>
-                            {{ item.timestamp.strftime('%B %d, %Y - %I:%M %p') }}
+                            <i class="fa-solid fa-calendar-day" style="margin-right: 0.2rem;"></i>
+                            {{ item.timestamp.strftime('%b %d, %Y — %I:%M %p') }}
                         </span>
                         
-                        <!-- Food details -->
                         <h3 class="timeline-food-name">{{ item.food.food_name }}</h3>
                         
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
-                            <span class="timeline-cuisine">{{ item.food.cuisine }} • {{ item.food.category }}</span>
-                            <span style="font-weight: 800; color: var(--primary); font-size: 0.95rem;">₹{{ item.food.price | int }}</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                            <span class="timeline-cuisine">{{ item.food.cuisine }} · {{ item.food.category }}</span>
+                            <span style="font-weight: 800; color: var(--primary); font-size: 0.9rem;">₹{{ item.food.price | int }}</span>
                         </div>
                         
-                        <div style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; border-top: 1px dashed var(--border-color); padding-top: 0.5rem;">
+                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; border-top: 1px dashed var(--border-color); padding-top: 0.4rem;">
                             {{ item.food.description }}
                         </div>
                     </div>
@@ -38,11 +36,11 @@
             {% endfor %}
         </div>
     {% else %}
-        <div style="text-align: center; padding: 4rem 2rem;">
-            <i class="fa-solid fa-clock-rotate-left" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1.5rem;"></i>
-            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">No History Logged Yet</h3>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">You haven't run any recommendations yet or your logged history was cleared.</p>
-            <a href="{{ url_for('index') }}" class="submit-btn" style="display: inline-flex; width: auto; padding: 0.75rem 1.5rem;">Get Suggestions Now</a>
+        <div style="text-align: center; padding: 3rem 1.5rem;">
+            <i class="fa-solid fa-clock-rotate-left" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem;">No history yet</h3>
+            <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 1.25rem;">Get some recommendations and they'll show up here.</p>
+            <a href="{{ url_for('index') }}" class="submit-btn" style="display: inline-flex; width: auto; padding: 0.6rem 1.25rem;">Discover Food</a>
         </div>
     {% endif %}
 </div>

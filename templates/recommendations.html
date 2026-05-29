@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}BiteWise - AI Food Suggestions{% endblock %}
+{% block title %}BiteWise — Your Picks{% endblock %}
 
-{% block page_title %}Your Top Recommendations{% endblock %}
+{% block page_title %}Your Picks{% endblock %}
 
 {% block content %}
 <div class="recommendations-wrapper">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
         <div>
-            <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem;">Tailored Just For You</h2>
-            <p style="color: var(--text-muted); font-size: 0.85rem;">We computed matching vectors for your diet, spice level, health target, and mood.</p>
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.2rem;">Matched for you</h2>
+            <p style="color: var(--text-secondary); font-size: 0.8rem;">Dishes matched to your taste.</p>
         </div>
-        <a href="{{ url_for('index') }}" class="admin-btn edit" style="text-decoration: none; padding: 0.6rem 1rem;">
+        <a href="{{ url_for('index') }}" class="admin-btn edit" style="text-decoration: none; padding: 0.5rem 0.85rem;">
             <i class="fa-solid fa-arrow-left"></i>
-            <span>Modify Preferences</span>
+            <span>Change Filters</span>
         </a>
     </div>
 
@@ -23,56 +23,72 @@
                 {% set food = item.food %}
                 {% set score = item.score %}
                 {% set explanation = item.explanation %}
-                
+
                 <div class="food-card">
                     <!-- Veg/Non-Veg Badge -->
                     <span class="food-badge {% if food.veg_nonveg == 'Veg' %}veg{% else %}non-veg{% endif %}">
                         <i class="fa-solid {% if food.veg_nonveg == 'Veg' %}fa-leaf{% else %}fa-circle-dot{% endif %}"></i>
                         {{ food.veg_nonveg }}
                     </span>
-                    
-                    <!-- Food Card Image Mockup -->
-                    <div class="food-image-placeholder">
-                        <i class="fa-solid {% if food.cuisine == 'Italian' %}fa-pizza-slice{% elif food.cuisine == 'Chinese' %}fa-bowl-rice{% elif food.cuisine == 'Indian' %}fa-pepper-hot{% else %}fa-hamburger{% endif %}"></i>
-                        <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">{{ food.cuisine }} Cuisine</span>
-                        
-                        <!-- Recommendation Match Indicator -->
+
+                    <!-- Food Image -->
+                    {% if food.image_url and food.image_url.startswith('http') %}
+                    <div class="food-image-container">
+                        <img src="{{ food.image_url }}"
+                             alt="{{ food.food_name }}"
+                             loading="lazy"
+                             onerror="this.parentElement.outerHTML='<div class=\'food-image-placeholder\'><i class=\'fa-solid fa-utensils\'></i><span>{{ food.cuisine }}</span></div>'">
+                        <div class="image-overlay"></div>
+
+                        <!-- Match Score -->
                         <div class="score-tag">
                             <i class="fa-solid fa-bolt"></i>
-                            <!-- Scoring mapping: scale maximum expected points (e.g. 15-20 points) to a percentage -->
                             {% set pct = (((score + 5) / 25) * 100) | round | int %}
                             {% set pct = 98 if pct > 98 else pct %}
                             {% set pct = 60 if pct < 60 else pct %}
-                            <span>{{ pct }}% Match</span>
+                            <span>{{ pct }}%</span>
                         </div>
                     </div>
-                    
+                    {% else %}
+                    <div class="food-image-placeholder">
+                        <i class="fa-solid {% if food.cuisine == 'Italian' %}fa-pizza-slice{% elif food.cuisine == 'Chinese' %}fa-bowl-rice{% elif food.cuisine == 'Indian' %}fa-pepper-hot{% elif food.cuisine == 'Japanese' %}fa-fish{% elif food.cuisine == 'Mexican' %}fa-lemon{% else %}fa-hamburger{% endif %}"></i>
+                        <span>{{ food.cuisine }}</span>
+
+                        <div class="score-tag">
+                            <i class="fa-solid fa-bolt"></i>
+                            {% set pct = (((score + 5) / 25) * 100) | round | int %}
+                            {% set pct = 98 if pct > 98 else pct %}
+                            {% set pct = 60 if pct < 60 else pct %}
+                            <span>{{ pct }}%</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <div class="food-details">
-                        <!-- Top Info -->
+                        <!-- Name & Price -->
                         <div class="food-info-top">
                             <h3 class="food-name">{{ food.food_name }}</h3>
                             <span class="food-price">₹{{ food.price | int }}</span>
                         </div>
-                        
+
                         <!-- Description -->
                         <p class="food-desc">{{ food.description }}</p>
-                        
+
                         <!-- Tags -->
                         <div class="food-tags">
                             <span class="tag cuisine-tag">{{ food.cuisine }}</span>
-                            <span class="tag spice-tag">{{ food.spice_level }} Spice</span>
+                            <span class="tag spice-tag">{{ food.spice_level }}</span>
                             <span class="tag">{{ food.category }}</span>
                             {% if food.meal_type %}
-                                <span class="tag" style="background-color: var(--primary-glow); color: var(--primary);">{{ food.meal_type }}</span>
+                                <span class="tag">{{ food.meal_type }}</span>
                             {% endif %}
                         </div>
-                        
-                        <!-- Nutrients Breakdown -->
+
+                        <!-- Compact Macros -->
                         <div class="nutrients-breakdown">
-                            <!-- Calories -->
                             <div class="nutrient-row">
                                 <div class="nutrient-header">
-                                    <span class="nutrient-name">Energy (Calories)</span>
+                                    <span class="nutrient-name">Calories</span>
                                     <span class="nutrient-val">{{ food.calories }} kcal</span>
                                 </div>
                                 <div class="nutrient-bar-bg">
@@ -80,8 +96,6 @@
                                     <div class="nutrient-bar-fill calories" style="width: {{ cal_pct }}%"></div>
                                 </div>
                             </div>
-                            
-                            <!-- Protein -->
                             <div class="nutrient-row">
                                 <div class="nutrient-header">
                                     <span class="nutrient-name">Protein</span>
@@ -92,11 +106,9 @@
                                     <div class="nutrient-bar-fill protein" style="width: {{ pro_pct }}%"></div>
                                 </div>
                             </div>
-                            
-                            <!-- Carbs -->
                             <div class="nutrient-row">
                                 <div class="nutrient-header">
-                                    <span class="nutrient-name">Carbohydrates</span>
+                                    <span class="nutrient-name">Carbs</span>
                                     <span class="nutrient-val">{{ food.carbs }}g</span>
                                 </div>
                                 <div class="nutrient-bar-bg">
@@ -104,8 +116,6 @@
                                     <div class="nutrient-bar-fill carbs" style="width: {{ carb_pct }}%"></div>
                                 </div>
                             </div>
-                            
-                            <!-- Fats -->
                             <div class="nutrient-row">
                                 <div class="nutrient-header">
                                     <span class="nutrient-name">Fats</span>
@@ -117,21 +127,21 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- AI Explanation Box -->
+
+                        <!-- AI reason (compact) -->
                         <div class="explanation-box">
                             <i class="fa-solid fa-circle-info"></i>
                             <span>{{ explanation }}</span>
                         </div>
-                        
-                        <!-- Ratings Form -->
-                        <div class="rating-action-box" style="margin-top: 0.5rem; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
-                            <form action="{{ url_for('submit_rating') }}" method="POST" style="display: flex; flex-direction: column; gap: 0.5rem;">
+
+                        <!-- Rating -->
+                        <div class="rating-action-box" style="margin-top: 0.25rem; border-top: 1px dashed var(--border-color); padding-top: 0.75rem;">
+                            <form action="{{ url_for('submit_rating') }}" method="POST" style="display: flex; flex-direction: column; gap: 0.4rem;">
                                 <input type="hidden" name="food_id" value="{{ food.food_id }}">
                                 <input type="hidden" class="rating-score-value" name="rating" value="5">
-                                
+
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span class="rating-title">Rate this recommendation:</span>
+                                    <span class="rating-title">Rate this:</span>
                                     <div class="rating-stars">
                                         <button type="button" class="rating-star-btn active"><i class="fa-solid fa-star"></i></button>
                                         <button type="button" class="rating-star-btn active"><i class="fa-solid fa-star"></i></button>
@@ -140,10 +150,10 @@
                                         <button type="button" class="rating-star-btn active"><i class="fa-solid fa-star"></i></button>
                                     </div>
                                 </div>
-                                
-                                <div style="display: flex; gap: 0.5rem;">
-                                    <input type="text" name="review" class="rating-comment-input" placeholder="Optional review (e.g. delicious, too salty)...">
-                                    <button type="submit" class="submit-rating-btn">Submit</button>
+
+                                <div style="display: flex; gap: 0.4rem;">
+                                    <input type="text" name="review" class="rating-comment-input" placeholder="Quick review...">
+                                    <button type="submit" class="submit-rating-btn">Rate</button>
                                 </div>
                             </form>
                         </div>
@@ -152,11 +162,11 @@
             {% endfor %}
         </div>
     {% else %}
-        <div class="glass-panel" style="text-align: center; padding: 4rem;">
-            <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; color: var(--accent); margin-bottom: 1.5rem;"></i>
-            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">No Matching Foods Found</h3>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">We couldn't find foods satisfying your specific filters. Try loosening your price limit or changing your diet type.</p>
-            <a href="{{ url_for('index') }}" class="submit-btn" style="display: inline-flex; width: auto; padding: 0.75rem 1.5rem;">Adjust Settings</a>
+        <div class="glass-panel" style="text-align: center; padding: 3rem;">
+            <i class="fa-solid fa-circle-exclamation" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.4rem;">Nothing matched</h3>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem;">Try wider filters or a different cuisine.</p>
+            <a href="{{ url_for('index') }}" class="submit-btn" style="display: inline-flex; width: auto; padding: 0.65rem 1.25rem;">Change Filters</a>
         </div>
     {% endif %}
 </div>

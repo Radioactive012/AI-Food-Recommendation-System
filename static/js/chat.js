@@ -70,13 +70,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.reply) {
                 appendMessage('bot', data.reply);
             } else {
-                appendMessage('bot', "Sorry, I encountered an issue processing your request.");
+                appendMessage('bot', "Oops, something went wrong on our end.");
             }
         })
         .catch(error => {
             console.error('Error:', error);
             removeTypingIndicator(typingId);
-            appendMessage('bot', "I'm having trouble connecting to the recommendation server. Please try again later.");
+            appendMessage('bot', "Can't reach the server right now. Give it a sec and try again!");
         });
     });
 
@@ -87,13 +87,63 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const bubble = document.createElement('div');
         bubble.classList.add('message-bubble');
-        bubble.innerHTML = text; // Allowing innerHTML to render formatted recommendation links
+
+        if (sender === 'bot') {
+            bubble.appendChild(sanitizeBotReply(text));
+        } else {
+            bubble.textContent = text;
+        }
         
         messageDiv.appendChild(bubble);
         chatMessages.appendChild(messageDiv);
         
         // Scroll to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function sanitizeBotReply(html) {
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        const fragment = document.createDocumentFragment();
+        const allowedInlineTags = new Set(['BR', 'EM', 'STRONG', 'B', 'I']);
+
+        function cleanNode(node, parent) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                parent.appendChild(document.createTextNode(node.textContent));
+                return;
+            }
+
+            if (node.nodeType !== Node.ELEMENT_NODE) {
+                return;
+            }
+
+            if (node.tagName === 'A') {
+                const href = node.getAttribute('href') || '';
+                const safeLink = href.startsWith('/recommendation-direct?food_id=');
+                if (safeLink) {
+                    const anchor = document.createElement('a');
+                    anchor.href = href;
+                    anchor.className = 'chat-food-link';
+                    anchor.textContent = node.textContent;
+                    parent.appendChild(anchor);
+                } else {
+                    parent.appendChild(document.createTextNode(node.textContent));
+                }
+                return;
+            }
+
+            if (allowedInlineTags.has(node.tagName)) {
+                const element = document.createElement(node.tagName.toLowerCase());
+                Array.from(node.childNodes).forEach(child => cleanNode(child, element));
+                parent.appendChild(element);
+                return;
+            }
+
+            Array.from(node.childNodes).forEach(child => cleanNode(child, parent));
+        }
+
+        Array.from(template.content.childNodes).forEach(node => cleanNode(node, fragment));
+        return fragment;
     }
 
     function appendTypingIndicator() {
@@ -104,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const bubble = document.createElement('div');
         bubble.classList.add('message-bubble');
-        bubble.innerHTML = '<i class="fa-solid fa-ellipsis fa-bounce"></i> BiteWise is thinking...';
+        bubble.innerHTML = '<i class="fa-solid fa-ellipsis fa-bounce"></i> Finding something delicious...';
         
         typingDiv.appendChild(bubble);
         chatMessages.appendChild(typingDiv);

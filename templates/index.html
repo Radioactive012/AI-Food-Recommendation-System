@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}BiteWise - AI Food Recommender Dashboard{% endblock %}
+{% block title %}BiteWise — Discover Food{% endblock %}
 
-{% block page_title %}Recommendation Engine{% endblock %}
+{% block page_title %}Discover{% endblock %}
 
 {% block content %}
 <div class="glass-panel">
-    <div style="margin-bottom: 2rem;">
-        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; font-family: 'Outfit';">Tune Your Taste Preferences</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Adjust criteria to get customized suggestions based on your lifestyle, appetite, and health goals.</p>
+    <div style="margin-bottom: 1.75rem;">
+        <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.3rem; font-family: 'Outfit';">What are you craving?</h2>
+        <p style="color: var(--text-secondary); font-size: 0.85rem;">Pick your vibe and we'll find the perfect dish.</p>
     </div>
     
     <form action="{{ url_for('get_recommendation_results') }}" method="POST" id="preferencesForm">
         <div class="form-grid">
             
-            <!-- 1. Cuisine Preference -->
+            <!-- Cuisine -->
             <div class="form-group full-width">
-                <label>Preferred Cuisine</label>
+                <label>Cuisine</label>
                 <input type="hidden" id="cuisineInput" name="cuisine" value="{{ user_profile.cuisine_preference or '' }}">
-                <div class="option-cards">
+                <div class="option-cards cuisine-cards">
                     <div class="option-card cuisine-card {% if user_profile.cuisine_preference == 'Indian' %}selected{% endif %}" data-value="Indian">
                         <i class="fa-solid fa-pepper-hot"></i>
                         <span>Indian</span>
@@ -35,21 +35,29 @@
                         <i class="fa-solid fa-hamburger"></i>
                         <span>American</span>
                     </div>
+                    <div class="option-card cuisine-card {% if user_profile.cuisine_preference == 'Japanese' %}selected{% endif %}" data-value="Japanese">
+                        <i class="fa-solid fa-fish"></i>
+                        <span>Japanese</span>
+                    </div>
+                    <div class="option-card cuisine-card {% if user_profile.cuisine_preference == 'Mexican' %}selected{% endif %}" data-value="Mexican">
+                        <i class="fa-solid fa-lemon"></i>
+                        <span>Mexican</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- 2. Diet Selection -->
+            <!-- Diet -->
             <div class="form-group full-width">
-                <label>Dietary Choice</label>
+                <label>Diet</label>
                 <input type="hidden" id="dietInput" name="diet" value="{{ user_profile.diet_type or 'Veg' }}">
                 <div class="option-cards diet-cards">
-                    <div class="option-card diet-card {% if user_profile.diet_type == 'Veg' %}selected{% endif %}" data-value="Veg">
+                    <div class="option-card diet-card {% if user_profile.diet_type == 'Veg' or not user_profile.diet_type %}selected{% endif %}" data-value="Veg">
                         <i class="fa-solid fa-seedling"></i>
                         <span>Vegetarian</span>
                     </div>
                     <div class="option-card diet-card {% if user_profile.diet_type == 'Non-Veg' %}selected{% endif %}" data-value="Non-Veg">
                         <i class="fa-solid fa-drumstick-bite"></i>
-                        <span>Non-Vegetarian</span>
+                        <span>Non-Veg</span>
                     </div>
                     <div class="option-card diet-card {% if user_profile.diet_type == 'Vegan' %}selected{% endif %}" data-value="Vegan">
                         <i class="fa-solid fa-leaf"></i>
@@ -58,96 +66,96 @@
                 </div>
             </div>
 
-            <!-- 3. Spice Tolerance -->
+            <!-- Spice Level -->
             <div class="form-group full-width">
-                <label>Spice Tolerance</label>
+                <label>Spice Level</label>
                 <input type="hidden" id="spiceInput" name="spice" value="{{ user_profile.spice_preference or 'Medium' }}">
-                <div class="option-cards" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="option-cards spice-cards">
                     <div class="option-card spice-card {% if user_profile.spice_preference == 'Low' %}selected{% endif %}" data-value="Low">
                         <i class="fa-solid fa-temperature-low"></i>
-                        <span>Mild / Low</span>
+                        <span>Mild</span>
                     </div>
-                    <div class="option-card spice-card {% if user_profile.spice_preference == 'Medium' %}selected{% endif %}" data-value="Medium">
+                    <div class="option-card spice-card {% if user_profile.spice_preference == 'Medium' or not user_profile.spice_preference %}selected{% endif %}" data-value="Medium">
                         <i class="fa-solid fa-temperature-half"></i>
-                        <span>Medium Spice</span>
+                        <span>Medium</span>
                     </div>
                     <div class="option-card spice-card {% if user_profile.spice_preference == 'High' %}selected{% endif %}" data-value="High">
                         <i class="fa-solid fa-fire"></i>
-                        <span>Extra Hot / High</span>
+                        <span>Hot</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 4. Health Goal -->
+            <!-- Health Goal -->
             <div class="form-group full-width">
-                <label>Health Goal</label>
+                <label>Goal</label>
                 <input type="hidden" id="healthInput" name="health_goal" value="{{ user_profile.health_goal or 'Healthy Eating' }}">
                 <div class="option-cards">
                     <div class="option-card health-card {% if user_profile.health_goal == 'Weight Loss' %}selected{% endif %}" data-value="Weight Loss">
-                        <i class="fa-solid fa-scale-down"></i>
-                        <span>Weight Loss</span>
+                        <i class="fa-solid fa-scale-balanced"></i>
+                        <span>Lose Weight</span>
                     </div>
                     <div class="option-card health-card {% if user_profile.health_goal == 'Muscle Gain' %}selected{% endif %}" data-value="Muscle Gain">
                         <i class="fa-solid fa-dumbbell"></i>
-                        <span>Muscle Gain</span>
+                        <span>Build Muscle</span>
                     </div>
                     <div class="option-card health-card {% if user_profile.health_goal == 'Maintenance' %}selected{% endif %}" data-value="Maintenance">
                         <i class="fa-solid fa-heart-pulse"></i>
-                        <span>Maintenance</span>
+                        <span>Maintain</span>
                     </div>
-                    <div class="option-card health-card {% if user_profile.health_goal == 'Healthy Eating' %}selected{% endif %}" data-value="Healthy Eating">
+                    <div class="option-card health-card {% if user_profile.health_goal == 'Healthy Eating' or not user_profile.health_goal %}selected{% endif %}" data-value="Healthy Eating">
                         <i class="fa-solid fa-apple-whole"></i>
-                        <span>Clean Eating</span>
+                        <span>Eat Clean</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 5. Mood / Mindset -->
+            <!-- Mood -->
             <div class="form-group full-width">
-                <label>Current Mood / Vibe</label>
+                <label>Mood</label>
                 <input type="hidden" id="moodInput" name="mood" value="{{ user_profile.mood_preference or 'Neutral' }}">
                 <div class="option-cards">
-                    <div class="option-card mood-card {% if user_profile.mood_preference == 'Neutral' %}selected{% endif %}" data-value="Neutral">
+                    <div class="option-card mood-card {% if user_profile.mood_preference == 'Neutral' or not user_profile.mood_preference %}selected{% endif %}" data-value="Neutral">
                         <i class="fa-solid fa-face-smile"></i>
-                        <span>Neutral / Balanced</span>
+                        <span>Balanced</span>
                     </div>
                     <div class="option-card mood-card {% if user_profile.mood_preference == 'Stressed' %}selected{% endif %}" data-value="Stressed">
                         <i class="fa-solid fa-face-grimace"></i>
-                        <span>Stressed / Comfort</span>
+                        <span>Comfort</span>
                     </div>
                     <div class="option-card mood-card {% if user_profile.mood_preference == 'Tired' %}selected{% endif %}" data-value="Tired">
                         <i class="fa-solid fa-face-tired"></i>
-                        <span>Tired / Energy</span>
+                        <span>Energy</span>
                     </div>
                     <div class="option-card mood-card {% if user_profile.mood_preference == 'Energetic' %}selected{% endif %}" data-value="Energetic">
                         <i class="fa-solid fa-bolt"></i>
-                        <span>Active / Gym Mode</span>
+                        <span>Gym Mode</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 6. Price Slider (Budget) -->
+            <!-- Budget Slider -->
             <div class="form-group slider-container">
-                <label for="budgetSlider">Maximum Budget</label>
+                <label for="budgetSlider">Budget</label>
                 <div class="slider-val-box">
                     <span>₹50</span>
-                    <span id="budgetVal" class="slider-val">₹500</span>
+                    <span id="budgetVal" class="slider-val">₹{{ user_profile.budget | default(500) | int }}</span>
                     <span>₹1000</span>
                 </div>
-                <input type="range" id="budgetSlider" name="budget" min="50" max="1000" value="500" class="range-slider">
+                <input type="range" id="budgetSlider" name="budget" min="50" max="1000" value="{{ user_profile.budget | default(500) | int }}" class="range-slider">
             </div>
 
-            <!-- 7. Search Input -->
+            <!-- Search -->
             <div class="form-group">
-                <label for="searchQuery">Keyword Search (Optional)</label>
-                <input type="text" id="searchQuery" name="search_query" class="form-input" placeholder="e.g. Avocado, Paneer, Spicy, Creamy...">
+                <label for="searchQuery">Search</label>
+                <input type="text" id="searchQuery" name="search_query" class="form-input" placeholder="Paneer, Spicy, Creamy..." value="{{ user_profile.search_query or '' }}">
             </div>
 
-            <!-- Submit Button -->
-            <div class="form-group full-width" style="margin-top: 1.5rem;">
+            <!-- Submit -->
+            <div class="form-group full-width" style="margin-top: 1rem;">
                 <button type="submit" class="submit-btn" id="submitPreferences">
-                    <i class="fa-solid fa-circle-nodes"></i>
-                    <span>Generate AI Recommendations</span>
+                    <i class="fa-solid fa-utensils"></i>
+                    <span>Find My Food</span>
                 </button>
             </div>
             

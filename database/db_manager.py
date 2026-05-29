@@ -16,17 +16,23 @@ def init_db(app):
         db.create_all()
         print("Database tables checked/created successfully.")
         
-        # Check if admin table is empty and seed default admin
+        # Check if admin table is empty and seed an admin only when credentials
+        # are provided through the environment.
         admin_count = Admin.query.count()
         if admin_count == 0:
-            default_admin = Admin(
-                admin_id=str(uuid.uuid4()),
-                username="admin",
-                password=generate_password_hash("admin123")
-            )
-            db.session.add(default_admin)
-            db.session.commit()
-            print("Default admin created (username: admin, password: admin123).")
+            admin_username = os.environ.get("ADMIN_USERNAME")
+            admin_password = os.environ.get("ADMIN_PASSWORD")
+            if admin_username and admin_password:
+                default_admin = Admin(
+                    admin_id=str(uuid.uuid4()),
+                    username=admin_username,
+                    password=generate_password_hash(admin_password, method='pbkdf2:sha256')
+                )
+                db.session.add(default_admin)
+                db.session.commit()
+                print(f"Default admin created (username: {admin_username}).")
+            else:
+                print("Skipping admin seed; set ADMIN_USERNAME and ADMIN_PASSWORD to create one.")
             
         # Check if foods table is empty and seed from datasets/foods.csv
         food_count = Food.query.count()
