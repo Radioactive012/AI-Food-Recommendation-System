@@ -1,5 +1,6 @@
 # Virtual environment
 venv/
+.venv/
 
 # Python cache
 __pycache__/
@@ -10,9 +11,18 @@ __pycache__/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # Flask instance
 instance/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Local archives and exported design drops
+*.zip
 
 # OS files
 .DS_Store

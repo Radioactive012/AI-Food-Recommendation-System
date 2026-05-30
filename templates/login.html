@@ -1,40 +1,39 @@
 {% extends "base.html" %}
 
-{% block title %}BiteWise - Sign In{% endblock %}
-
-{% block page_title %}Account Access{% endblock %}
+{% block title %}Urban Diner - Sign In{% endblock %}
 
 {% block content %}
-<div class="auth-container">
-    <div class="auth-card glass-panel">
-        <div class="auth-header">
-            <i class="fa-solid fa-lock-open"></i>
-            <h2>Welcome Back</h2>
-            <p>Enter your credentials to access personalized diets</p>
-        </div>
-        
-        <form action="{{ url_for('login') }}" method="POST">
-            <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="form-group">
-                    <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" class="form-input" placeholder="e.g. foodlover@example.com" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required>
-                </div>
-                
-                <button type="submit" class="submit-btn">
-                    <i class="fa-solid fa-right-to-bracket"></i>
-                    <span>Sign In</span>
-                </button>
-            </div>
-        </form>
-        
-        <div class="auth-footer-link">
-            Don't have an account? <a href="{{ url_for('register') }}">Create Account</a>
-        </div>
+<section class="auth-shell">
+    <div class="auth-visual">
+        <span class="section-kicker">Member table</span>
+        <h1>Welcome back.</h1>
+        <p>Sign in to keep your taste profile, saved preferences, and recommendations close at hand.</p>
     </div>
-</div>
+
+    <div class="auth-card">
+        <div class="section-heading">
+            <h1>Sign In</h1>
+            <p>Use the account you created for Urban Diner.</p>
+        </div>
+
+        <form action="{{ url_for('login') }}" method="POST" class="auth-form">
+            <div class="preference-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com" required>
+            </div>
+
+            <div class="preference-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-input" placeholder="At least 6 characters" required>
+            </div>
+
+            <button type="submit" class="primary-cta">
+                <span class="material-symbols-outlined">login</span>
+                Sign In
+            </button>
+        </form>
+
+        <p class="auth-footer-link">New here? <a href="{{ url_for('register') }}">Create an account</a></p>
+    </div>
+</section>
 {% endblock %}

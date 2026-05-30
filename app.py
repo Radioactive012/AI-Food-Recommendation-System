@@ -2,13 +2,19 @@ import os
 import csv
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 from ml.similarity_model import RecommendationEngine
+from models.models import db, User
 import requests
 import json
 
 app = Flask(__name__)
 app.config.from_object(Config)
+db.init_app(app)
+
+with app.app_context():
+    db.create_all()
 
 # Initialize Recommendation Engine
 engine = RecommendationEngine()
@@ -80,9 +86,13 @@ foods_list = load_foods()
 # Context processor to expose common variables to templates (always evaluated to dummy/neutral values to avoid template crashes)
 @app.context_processor
 def inject_user():
+    current_user = None
+    user_id = session.get('user_id')
+    if user_id:
+        current_user = db.session.get(User, user_id)
     return dict(
-        current_user=None,
-        is_logged_in=False
+        current_user=current_user,
+        is_logged_in=current_user is not None
     )
 
 # --- ROUTES ---
@@ -91,17 +101,88 @@ def inject_user():
 def index():
     # If the user has preferences saved in session, pass them.
     user_profile = session.get('preferences', {})
-    return render_template('index.html', user_profile=user_profile, active_page='home')
+    return render_template(
+        'index.html',
+        user_profile=user_profile,
+        featured_foods=foods_list[:3],
+        active_page='home'
+    )
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # Completely redirect to index
-    return redirect(url_for('index'))
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        user = User.query.filter_by(email=email).first()
+
+        if not user or not check_password_hash(user.password, password):
+            flash('Invalid email or password.', 'error')
+            return render_template('login.html', active_page='login'), 401
+
+        session['user_id'] = user.user_id
+        session['preferences'] = {
+            'diet_type': user.diet_type or 'Veg',
+            'spice_preference': user.spice_preference or 'Medium',
+            'health_goal': user.health_goal or 'Healthy Eating',
+            'mood_preference': user.mood_preference or 'Neutral',
+            'cuisine_preference': '',
+            'budget': 500,
+            'search_query': ''
+        }
+        flash(f'Welcome back, {user.name}.', 'success')
+        return redirect(url_for('index'))
+
+    return render_template('login.html', active_page='login')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    # Completely redirect to index
-    return redirect(url_for('index'))
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+
+        if not name or not email or len(password) < 6:
+            flash('Please enter your name, email, and a password of at least 6 characters.', 'error')
+            return render_template('register.html', active_page='login'), 400
+
+        if User.query.filter_by(email=email).first():
+            flash('An account with that email already exists. Please sign in.', 'error')
+            return redirect(url_for('login'))
+
+        def optional_int(value):
+            try:
+                return int(value) if value else None
+            except ValueError:
+                return None
+
+        user = User(
+            name=name,
+            email=email,
+            password=generate_password_hash(password, method='pbkdf2:sha256'),
+            age=optional_int(request.form.get('age')),
+            gender=request.form.get('gender') or None,
+            diet_type=request.form.get('diet_type') or 'Veg',
+            spice_preference=request.form.get('spice_preference') or 'Medium',
+            health_goal=request.form.get('health_goal') or 'Healthy Eating',
+            mood_preference=request.form.get('mood_preference') or 'Neutral'
+        )
+        db.session.add(user)
+        db.session.commit()
+
+        session['user_id'] = user.user_id
+        session['preferences'] = {
+            'diet_type': user.diet_type,
+            'spice_preference': user.spice_preference,
+            'health_goal': user.health_goal,
+            'mood_preference': user.mood_preference,
+            'cuisine_preference': '',
+            'budget': 500,
+            'search_query': ''
+        }
+        flash('Account created. Your taste profile is ready.', 'success')
+        return redirect(url_for('index'))
+
+    return render_template('register.html', active_page='login')
 
 @app.route('/logout')
 def logout():
@@ -191,7 +272,12 @@ def get_recommendation_results():
         session['history'] = history[-20:] # Keep last 20 entries
         session.modified = True
 
-    return render_template('recommendations.html', suggestions=suggestions)
+    return render_template(
+        'recommendations.html',
+        suggestions=suggestions,
+        user_profile=session.get('preferences', {}),
+        active_page='hitlist'
+    )
 
 @app.route('/history')
 def history():
@@ -271,7 +357,12 @@ def direct_food_info():
         'score': 15,
         'explanation': "Served directly from your assistant selection."
     }
-    return render_template('recommendations.html', suggestions=[dummy_item])
+    return render_template(
+        'recommendations.html',
+        suggestions=[dummy_item],
+        user_profile=session.get('preferences', {}),
+        active_page='hitlist'
+    )
 
 # --- ADMIN PANEL ---
 

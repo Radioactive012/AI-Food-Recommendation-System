@@ -1,28 +1,7 @@
 // BiteWise AI Food Recommendation System - Interactive JavaScript
 
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. Theme Toggle Logic
-    const themeToggleBtn = document.getElementById('themeToggleBtn');
-    const body = document.body;
-
-    // Check local storage for theme preference
-    if (localStorage.getItem('theme') === 'light') {
-        body.classList.add('light-theme');
-        if (themeToggleBtn) {
-            themeToggleBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
-        }
-    }
-
-    if (themeToggleBtn) {
-        themeToggleBtn.addEventListener('click', function() {
-            body.classList.toggle('light-theme');
-            const isLight = body.classList.contains('light-theme');
-            localStorage.setItem('theme', isLight ? 'light' : 'dark');
-            themeToggleBtn.innerHTML = isLight ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
-        });
-    }
-
-    // 2. Budget Range Slider Display Update
+    // 1. Budget Range Slider Display Update
     const budgetSlider = document.getElementById('budgetSlider');
     const budgetValDisplay = document.getElementById('budgetVal');
 
@@ -32,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 3. Option Cards Selector Helper (converts cards into form inputs)
+    // 2. Option Cards Selector Helper (converts cards into form inputs)
     setupCardSelectors('cuisine-card', 'cuisineInput');
     setupCardSelectors('diet-card', 'dietInput');
     setupCardSelectors('spice-card', 'spiceInput');
@@ -60,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 4. Stars Rating Hover and Click Logic on Food Cards
+    // 3. Stars Rating Hover and Click Logic on Food Cards
     const ratingContainers = document.querySelectorAll('.rating-stars');
 
     ratingContainers.forEach(container => {
@@ -100,8 +79,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 5. AJAX Rating Submission
-    const ratingForms = document.querySelectorAll('.rating-action-box form');
+    // 4. AJAX Rating Submission
+    const ratingForms = document.querySelectorAll('.rating-action-box form, form.rating-action-box');
     ratingForms.forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();

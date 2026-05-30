@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const bubble = document.createElement('div');
         bubble.classList.add('message-bubble');
-        bubble.innerHTML = '<i class="fa-solid fa-ellipsis fa-bounce"></i> Finding something delicious...';
+        bubble.textContent = 'Finding something delicious...';
         
         typingDiv.appendChild(bubble);
         chatMessages.appendChild(typingDiv);
