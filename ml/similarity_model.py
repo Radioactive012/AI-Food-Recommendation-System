@@ -40,8 +40,13 @@ class RecommendationEngine:
         # 1. PHASE 1: Rule-Based Filtering
         filtered_foods = []
         user_diet = user_profile.get('diet_type', 'Veg') # Default to Veg for safety
+        user_budget = float(user_profile.get('budget', 1000))
         
         for food in all_foods:
+            # Rule: Strict Budget Limit
+            if food.price > user_budget:
+                continue
+                
             # Rule: If user is Veg, they only get Veg foods.
             if user_diet == 'Veg' and food.veg_nonveg != 'Veg':
                 continue
@@ -125,10 +130,9 @@ class RecommendationEngine:
                 explanations.append(f"matches your spice tolerance ({food.spice_level})")
                 
             # Match Budget (+2)
-            if food.price <= user_budget:
+            # All remaining foods are under budget, but we give a bonus for being significantly cheaper
+            if food.price <= user_budget * 0.8:
                 score += 2
-            else:
-                score -= 3 # penalty for exceeding budget
                 
             # Match Health Goal (+4)
             if user_health == 'Weight Loss':
