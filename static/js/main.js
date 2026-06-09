@@ -182,4 +182,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // 6. Auto-dismiss flash messages after 5 seconds
+    const flashMessages = document.querySelectorAll('.flash-message');
+    flashMessages.forEach(msg => {
+        setTimeout(() => {
+            msg.style.opacity = '0';
+            msg.style.transform = 'translateY(-15px) scale(0.95)';
+            setTimeout(() => msg.remove(), 400);
+        }, 5000);
+    });
 });

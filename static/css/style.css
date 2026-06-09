@@ -211,29 +211,46 @@ img {
 }
 
 .flash-stack {
+    position: fixed;
+    top: 96px;
+    right: 24px;
+    z-index: 9999;
     display: grid;
     gap: 12px;
-    margin-bottom: 24px;
+    max-width: 380px;
+    width: calc(100% - 48px);
+    pointer-events: none;
 }
 
 .flash-message {
+    pointer-events: auto;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 16px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface-lowest);
-    box-shadow: var(--shadow-soft);
-    color: var(--text-soft);
+    gap: 12px;
+    padding: 16px 20px;
+    border: 1px solid rgba(193, 200, 195, 0.4);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-panel);
+    color: var(--text);
+    animation: flashSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 .flash-message.success {
-    border-color: rgba(47, 111, 86, 0.25);
+    border-left: 4px solid var(--primary);
+    background: rgba(244, 248, 245, 0.95);
 }
 
 .flash-message.error {
-    border-color: rgba(186, 26, 26, 0.25);
+    border-left: 4px solid var(--danger);
+    background: rgba(253, 244, 244, 0.95);
+}
+
+.flash-message.warning {
+    border-left: 4px solid var(--gold);
+    background: rgba(253, 250, 244, 0.95);
 }
 
 .flash-message button {
@@ -242,6 +259,19 @@ img {
     background: transparent;
     color: var(--text-muted);
     font-weight: 700;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+@keyframes flashSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .home-flow {
