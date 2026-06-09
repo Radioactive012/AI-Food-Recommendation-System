@@ -15,3 +15,4 @@ instance
 *.zip
 .DS_Store
 Thumbs.db
+*.log
