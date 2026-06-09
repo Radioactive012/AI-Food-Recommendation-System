@@ -4,9 +4,6 @@ import concurrent.futures
 from functools import wraps
 from datetime import datetime, timedelta
 import secrets
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlsplit
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -140,6 +137,37 @@ def admin_is_logged_in():
     return session.get('admin_logged_in') is True
 
 
+def dev_otp_reset_enabled():
+    """Allow the local OTP reset helper only outside production deployments."""
+    production_flags = {
+        os.environ.get('VERCEL'),
+        os.environ.get('FLASK_ENV'),
+        os.environ.get('ENV'),
+        os.environ.get('APP_ENV'),
+    }
+    is_production = '1' in production_flags or 'production' in production_flags
+    return os.environ.get('ENABLE_DEV_OTP_RESET') == '1' and not is_production
+
+
+def start_user_session(user):
+    session['user_id'] = user.user_id
+    session['preferences'] = {
+        'diet_type': user.diet_type or 'Veg',
+        'spice_preference': user.spice_preference or 'Medium',
+        'health_goal': user.health_goal or 'Healthy Eating',
+        'mood_preference': user.mood_preference or 'Neutral',
+        'cuisine_preference': '',
+        'budget': 500,
+        'search_query': ''
+    }
+    session['allergies'] = user.get_allergies_list()
+    if user.learned_prefs:
+        try:
+            session['learned_prefs'] = json.loads(user.learned_prefs)
+        except (TypeError, ValueError):
+            pass
+
+
 def require_admin(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
@@ -260,70 +288,11 @@ def inject_user():
         all_allergens=ALL_ALLERGENS,
         user_allergies=get_user_allergies(),
         get_food_vitamins=get_food_vitamins,
+        password_reset_enabled=dev_otp_reset_enabled(),
     )
 
 def generate_otp():
     return "".join(secrets.choice("0123456789") for _ in range(6))
-
-
-def send_otp_email(email, otp_code, user_name, subject_prefix="Urban Diner"):
-    subject = f"{subject_prefix} - Email Verification Code"
-    body = f"""Hi {user_name},
-
-Thank you for choosing Urban Diner! To verify your email address, please use the 6-digit One Time Password (OTP) below:
-
-👉 {otp_code}
-
-This code is valid for 10 minutes. If you did not request this, you can safely ignore this email.
-
-Happy Dining!
-The Urban Diner Team
-"""
-    
-    # Try sending real email if SMTP is configured
-    smtp_server = os.environ.get('SMTP_SERVER')
-    smtp_port = os.environ.get('SMTP_PORT', 587)
-    smtp_user = os.environ.get('SMTP_USERNAME')
-    smtp_pass = os.environ.get('SMTP_PASSWORD')
-    smtp_from = os.environ.get('SMTP_FROM_EMAIL', 'no-reply@urbandiner.com')
-    
-    sent_via_smtp = False
-    smtp_error = None
-    
-    if smtp_server and smtp_user and smtp_pass:
-        try:
-            msg = MIMEMultipart()
-            msg['From'] = smtp_from
-            msg['To'] = email
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain'))
-            
-            server = smtplib.SMTP(smtp_server, int(smtp_port), timeout=10)
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_from, email, msg.as_string())
-            server.quit()
-            sent_via_smtp = True
-        except Exception as e:
-            smtp_error = str(e)
-            print(f"SMTP sending failed: {e}")
-            
-    # Write to local file log (sent_emails.log)
-    log_file = os.path.join(app.root_path, 'sent_emails.log')
-    try:
-        with open(log_file, 'a', encoding='utf-8') as lf:
-            lf.write(f"\n{'='*50}\n")
-            lf.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            lf.write(f"To: {email}\n")
-            lf.write(f"Subject: {subject}\n")
-            lf.write(f"SMTP Status: {'Sent' if sent_via_smtp else ('Failed: ' + smtp_error if smtp_error else 'Not Configured (Simulated)')}\n")
-            lf.write(f"Body:\n{body}\n")
-            lf.write(f"{'='*50}\n")
-    except Exception as le:
-        print(f"Failed to write email to log: {le}")
-        
-    print(f"\n[EMAIL SIMULATION] To: {email} | Subject: {subject} | OTP: {otp_code}\n")
-    return sent_via_smtp
 
 
 # --- ROUTES ---
@@ -361,31 +330,13 @@ def login():
             flash('Invalid email or password.', 'error')
             return render_template('login.html', active_page='login'), 401
 
-        if not user.is_verified:
-            # Generate and send new OTP
-            user.otp_code = generate_otp()
-            user.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+        if not user.is_verified or user.otp_code or user.otp_expiry:
+            user.is_verified = True
+            user.otp_code = None
+            user.otp_expiry = None
             db.session.commit()
-            send_otp_email(user.email, user.otp_code, user.name)
-            flash('Please verify your email address to log in. An OTP has been sent.', 'warning')
-            return redirect(url_for('verify_otp', email=user.email))
 
-        session['user_id'] = user.user_id
-        session['preferences'] = {
-            'diet_type': user.diet_type or 'Veg',
-            'spice_preference': user.spice_preference or 'Medium',
-            'health_goal': user.health_goal or 'Healthy Eating',
-            'mood_preference': user.mood_preference or 'Neutral',
-            'cuisine_preference': '',
-            'budget': 500,
-            'search_query': ''
-        }
-        session['allergies'] = user.get_allergies_list()
-        if user.learned_prefs:
-            try:
-                session['learned_prefs'] = json.loads(user.learned_prefs)
-            except (TypeError, ValueError):
-                pass
+        start_user_session(user)
         flash(f'Welcome back, {user.name}.', 'success')
         return redirect(url_for('index'))
 
@@ -427,18 +378,16 @@ def register():
             health_goal=request.form.get('health_goal') or 'Healthy Eating',
             mood_preference=request.form.get('mood_preference') or 'Neutral',
             allergies=allergies_str,
-            is_verified=False,
-            otp_code=generate_otp(),
-            otp_expiry=datetime.utcnow() + timedelta(minutes=10)
+            is_verified=True,
+            otp_code=None,
+            otp_expiry=None
         )
         db.session.add(user)
         db.session.commit()
 
-        # Send simulated/actual OTP email
-        send_otp_email(user.email, user.otp_code, user.name)
-
-        flash('Account created. Please enter the verification OTP sent to your email.', 'success')
-        return redirect(url_for('verify_otp', email=user.email))
+        start_user_session(user)
+        flash(f'Welcome to Urban Diner, {user.name}.', 'success')
+        return redirect(url_for('index'))
 
     return render_template('register.html', active_page='login')
 
@@ -455,86 +404,22 @@ def logout():
 
 @app.route('/verify-otp', methods=['GET', 'POST'])
 def verify_otp():
-    email = request.args.get('email', '').strip().lower() or request.form.get('email', '').strip().lower()
-    if not email:
-        flash('Email address is required for verification.', 'error')
-        return redirect(url_for('login'))
-        
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        flash('Account not found.', 'error')
-        return redirect(url_for('login'))
-        
-    if user.is_verified:
-        flash('This account is already verified. Please sign in.', 'info')
-        return redirect(url_for('login'))
-        
-    if request.method == 'POST':
-        otp = request.form.get('otp', '').strip()
-        if not otp or len(otp) != 6:
-            flash('Please enter a valid 6-digit OTP code.', 'error')
-            return render_template('verify_otp.html', email=email, dev_otp=user.otp_code)
-            
-        if user.otp_code != otp:
-            flash('Incorrect OTP code. Please try again.', 'error')
-            return render_template('verify_otp.html', email=email, dev_otp=user.otp_code)
-            
-        if user.otp_expiry and user.otp_expiry < datetime.utcnow():
-            flash('This OTP has expired. Please request a new code.', 'error')
-            return render_template('verify_otp.html', email=email, dev_otp=user.otp_code)
-            
-        # Success!
-        user.is_verified = True
-        user.otp_code = None
-        user.otp_expiry = None
-        db.session.commit()
-        
-        # Log user in
-        session['user_id'] = user.user_id
-        session['preferences'] = {
-            'diet_type': user.diet_type or 'Veg',
-            'spice_preference': user.spice_preference or 'Medium',
-            'health_goal': user.health_goal or 'Healthy Eating',
-            'mood_preference': user.mood_preference or 'Neutral',
-            'cuisine_preference': '',
-            'budget': 500,
-            'search_query': ''
-        }
-        session['allergies'] = user.get_allergies_list()
-        
-        flash('Email address verified successfully! Welcome to Urban Diner.', 'success')
-        return redirect(url_for('index'))
-        
-    return render_template('verify_otp.html', email=email, dev_otp=user.otp_code)
+    flash('Email verification is no longer required. Please sign in.', 'info')
+    return redirect(url_for('login'))
 
 
 @app.route('/resend-otp', methods=['POST'])
 def resend_otp():
-    email = request.form.get('email', '').strip().lower()
-    if not email:
-        flash('Email address is required to resend OTP.', 'error')
-        return redirect(url_for('login'))
-        
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        flash('Account not found.', 'error')
-        return redirect(url_for('login'))
-        
-    if user.is_verified:
-        flash('This account is already verified. Please sign in.', 'info')
-        return redirect(url_for('login'))
-        
-    user.otp_code = generate_otp()
-    user.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
-    db.session.commit()
-    
-    send_otp_email(user.email, user.otp_code, user.name)
-    flash('A new OTP verification code has been sent to your email.', 'success')
-    return redirect(url_for('verify_otp', email=user.email))
+    flash('Email verification is no longer required. Please sign in.', 'info')
+    return redirect(url_for('login'))
 
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
+    if not dev_otp_reset_enabled():
+        flash('Password reset is disabled for this deployment. Please create a new account or contact the project owner.', 'info')
+        return redirect(url_for('login'))
+
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         if not email:
@@ -546,12 +431,11 @@ def forgot_password():
             user.otp_code = generate_otp()
             user.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
             db.session.commit()
-            send_otp_email(user.email, user.otp_code, user.name, subject_prefix="Urban Diner Password Reset")
-            flash('A password reset code has been sent to your email.', 'success')
+            flash('Development reset code generated. Use the code shown on the next screen.', 'success')
             return redirect(url_for('reset_password', email=user.email))
         else:
             print(f"[FORGOT PASSWORD] Requested email not found: {email}")
-            flash('If that email exists in our system, we have sent a reset code to it.', 'info')
+            flash('If that email exists in our system, a development reset code was generated.', 'info')
             return render_template('forgot_password.html')
             
     return render_template('forgot_password.html')
@@ -559,6 +443,10 @@ def forgot_password():
 
 @app.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
+    if not dev_otp_reset_enabled():
+        flash('Password reset is disabled for this deployment. Please create a new account or contact the project owner.', 'info')
+        return redirect(url_for('login'))
+
     email = request.args.get('email', '').strip().lower() or request.form.get('email', '').strip().lower()
     if not email:
         flash('Email address is required to reset password.', 'error')

@@ -112,12 +112,12 @@
                 <textarea id="admin_description" name="description" class="form-input" rows="3" placeholder="Explain the ingredients, nutritional balance, or taste profiles..." required></textarea>
             </div>
             
-            <div class="form-group full-width" style="display: flex; gap: 1rem;">
-                <button type="submit" class="submit-btn" style="flex-grow: 1;">
+            <div class="form-group full-width form-action-row">
+                <button type="submit" class="submit-btn form-submit-btn">
                     <i class="fa-solid fa-save"></i>
                     <span id="formSubmitText">Save Food Item</span>
                 </button>
-                <button type="button" class="submit-btn" id="cancelEditBtn" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); display: none; width: auto;">
+                <button type="button" class="submit-btn submit-btn-secondary" id="cancelEditBtn" hidden>
                     Cancel
                 </button>
             </div>
@@ -201,7 +201,7 @@
         
         // Show Cancel button and modify action text
         document.getElementById('formSubmitText').textContent = "Update Food Item";
-        document.getElementById('cancelEditBtn').style.display = "block";
+        document.getElementById('cancelEditBtn').hidden = false;
         
         // Scroll to form top smoothly
         document.getElementById('adminFoodForm').scrollIntoView({ behavior: 'smooth' });
@@ -214,7 +214,7 @@
         
         // Reset button states
         document.getElementById('formSubmitText').textContent = "Save Food Item";
-        this.style.display = "none";
+        this.hidden = true;
     });
 </script>
 {% endblock %}

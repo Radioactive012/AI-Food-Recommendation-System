@@ -27,7 +27,7 @@
                     <button type="button" class="planner-goal segment" data-value="Weight Loss">Weight Loss</button>
                     <button type="button" class="planner-goal segment" data-value="Muscle Gain">Muscle Gain</button>
                 </div>
-                <div class="segmented-row planner-goal-row" style="margin-top:8px;">
+                <div class="segmented-row planner-goal-row planner-goal-row-extra">
                     <button type="button" class="planner-goal segment" data-value="Diabetes-Friendly">Diabetes</button>
                     <button type="button" class="planner-goal segment" data-value="Heart-Healthy">Heart</button>
                     <button type="button" class="planner-goal segment" data-value="Maintenance">Maintain</button>
@@ -38,6 +38,7 @@
             <span class="material-symbols-outlined">auto_awesome</span>
             Generate Meal Plan
         </button>
+        <p class="form-feedback" id="plannerFeedback" hidden></p>
     </div>
 </section>
 
@@ -47,7 +48,7 @@
             <h2>Your Meal Plan</h2>
             <p id="planSubtitle"></p>
         </div>
-        <button type="button" class="secondary-cta" id="groceryFromPlanBtn" style="width:auto;">
+        <button type="button" class="secondary-cta cta-compact" id="groceryFromPlanBtn">
             <span class="material-symbols-outlined">shopping_cart</span>
             Generate Grocery List
         </button>
@@ -62,6 +63,17 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPlanId = null;
     let selectedDiet = 'Veg';
     let selectedGoal = 'Healthy Eating';
+    const plannerFeedback = document.getElementById('plannerFeedback');
+
+    function showPlannerFeedback(message) {
+        plannerFeedback.textContent = message;
+        plannerFeedback.hidden = false;
+    }
+
+    function clearPlannerFeedback() {
+        plannerFeedback.hidden = true;
+        plannerFeedback.textContent = '';
+    }
 
     // Diet toggle
     document.querySelectorAll('.planner-diet').forEach(btn => {
@@ -84,6 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Generate plan
     document.getElementById('generatePlanBtn').addEventListener('click', function() {
         const btn = this;
+        clearPlannerFeedback();
         btn.disabled = true;
         btn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> Generating...';
 
@@ -99,18 +112,22 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(r => r.json())
         .then(data => {
             btn.disabled = false;
-            btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span> Regenerate Plan';
 
             if (data.status === 'success') {
+                btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span> Regenerate Plan';
                 currentPlanId = data.plan_id;
                 renderPlan(data.plan);
                 document.getElementById('planResults').style.display = '';
                 document.getElementById('planResults').scrollIntoView({behavior: 'smooth'});
+            } else {
+                btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span> Generate Meal Plan';
+                showPlannerFeedback(data.message || 'Could not generate a meal plan. Try another diet or goal.');
             }
         })
         .catch(() => {
             btn.disabled = false;
             btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span> Generate Meal Plan';
+            showPlannerFeedback('Could not generate a meal plan right now. Please try again.');
         });
     });
 

@@ -509,7 +509,7 @@ class AuthAndProfileTestCase(unittest.TestCase):
             db.drop_all()
             db.create_all()
 
-    def test_registration_sends_otp_and_redirects(self):
+    def test_registration_logs_in_without_otp(self):
         # Register new user
         response = self.client.post('/register', data={
             'name': 'Rahul Sharma',
@@ -522,47 +522,47 @@ class AuthAndProfileTestCase(unittest.TestCase):
             'health_goal': 'Healthy Eating',
         })
         self.assertEqual(response.status_code, 302)
-        self.assertIn('/verify-otp?email=rahul@example.com', response.location)
+        self.assertEqual(response.location, '/')
         
-        # Check user exists in DB and is not verified
+        # Check user exists in DB, is verified, and has no OTP state.
         with app.app_context():
             user = User.query.filter_by(email='rahul@example.com').first()
             self.assertIsNotNone(user)
-            self.assertFalse(user.is_verified)
-            self.assertIsNotNone(user.otp_code)
-            self.assertEqual(len(user.otp_code), 6)
+            self.assertTrue(user.is_verified)
+            self.assertIsNone(user.otp_code)
+            self.assertIsNone(user.otp_expiry)
+            user_id = user.user_id
 
-    def test_verify_otp_success_logs_in(self):
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('user_id'), user_id)
+
+    def test_verify_otp_legacy_route_redirects_to_login(self):
         # Create unverified user manually
         with app.app_context():
             from werkzeug.security import generate_password_hash
-            from datetime import datetime, timedelta
             user = User(
                 name='Rahul',
                 email='rahul@example.com',
                 password=generate_password_hash('password123', method='pbkdf2:sha256'),
                 is_verified=False,
                 otp_code='123456',
-                otp_expiry=datetime.utcnow() + timedelta(minutes=10)
             )
             db.session.add(user)
             db.session.commit()
 
-        # Post correct OTP
         response = self.client.post('/verify-otp', data={
             'email': 'rahul@example.com',
             'otp': '123456',
         })
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.location, '/')
+        self.assertIn('/login', response.location)
 
-        # Verify DB is updated
         with app.app_context():
             user = User.query.filter_by(email='rahul@example.com').first()
-            self.assertTrue(user.is_verified)
-            self.assertIsNone(user.otp_code)
+            self.assertFalse(user.is_verified)
+            self.assertEqual(user.otp_code, '123456')
 
-    def test_login_blocks_unverified_and_redirects(self):
+    def test_login_upgrades_legacy_unverified_user(self):
         # Create unverified user manually
         with app.app_context():
             from werkzeug.security import generate_password_hash
@@ -582,9 +582,35 @@ class AuthAndProfileTestCase(unittest.TestCase):
             'password': 'password123',
         })
         self.assertEqual(response.status_code, 302)
-        self.assertIn('/verify-otp?email=rahul@example.com', response.location)
+        self.assertEqual(response.location, '/')
 
-    def test_forgot_and_reset_password(self):
+        with app.app_context():
+            user = User.query.filter_by(email='rahul@example.com').first()
+            self.assertTrue(user.is_verified)
+            self.assertIsNone(user.otp_code)
+
+    def test_forgot_password_disabled_by_default(self):
+        response = self.client.get('/forgot-password')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login', response.location)
+
+        response = self.client.post('/forgot-password', data={'email': 'rahul@example.com'})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login', response.location)
+
+    def test_dev_otp_reset_disabled_on_vercel(self):
+        os.environ['ENABLE_DEV_OTP_RESET'] = '1'
+        os.environ['VERCEL'] = '1'
+        try:
+            response = self.client.get('/forgot-password')
+            self.assertEqual(response.status_code, 302)
+            self.assertIn('/login', response.location)
+        finally:
+            os.environ.pop('ENABLE_DEV_OTP_RESET', None)
+            os.environ.pop('VERCEL', None)
+
+    def test_dev_otp_reset_helper(self):
+        os.environ['ENABLE_DEV_OTP_RESET'] = '1'
         # Create verified user
         with app.app_context():
             from werkzeug.security import generate_password_hash
@@ -597,37 +623,43 @@ class AuthAndProfileTestCase(unittest.TestCase):
             db.session.add(user)
             db.session.commit()
 
-        # Request forgot password OTP
-        response = self.client.post('/forgot-password', data={
-            'email': 'rahul@example.com',
-        })
-        self.assertEqual(response.status_code, 302)
-        self.assertIn('/reset-password?email=rahul@example.com', response.location)
+        try:
+            # Request local development reset code.
+            response = self.client.post('/forgot-password', data={
+                'email': 'rahul@example.com',
+            })
+            self.assertEqual(response.status_code, 302)
+            self.assertIn('/reset-password?email=rahul@example.com', response.location)
 
-        # Get generated OTP
-        with app.app_context():
-            user = User.query.filter_by(email='rahul@example.com').first()
-            otp = user.otp_code
-            self.assertIsNotNone(otp)
+            # Get generated development reset code.
+            with app.app_context():
+                user = User.query.filter_by(email='rahul@example.com').first()
+                otp = user.otp_code
+                self.assertIsNotNone(otp)
 
-        # Reset password
-        reset_resp = self.client.post('/reset-password', data={
-            'email': 'rahul@example.com',
-            'otp': otp,
-            'password': 'newpassword123',
-            'confirm_password': 'newpassword123',
-        })
-        self.assertEqual(reset_resp.status_code, 302)
-        self.assertIn('/login', reset_resp.location)
+            reset_page = self.client.get('/reset-password?email=rahul@example.com')
+            self.assertEqual(reset_page.status_code, 200)
+            self.assertIn(otp.encode(), reset_page.data)
 
-        # Try logging in with new password
-        login_resp = self.client.post('/login', data={
-            'email': 'rahul@example.com',
-            'password': 'newpassword123',
-        })
-        # If verified, logs in and redirects to '/' (Discover)
-        self.assertEqual(login_resp.status_code, 302)
-        self.assertEqual(login_resp.location, '/')
+            # Reset password
+            reset_resp = self.client.post('/reset-password', data={
+                'email': 'rahul@example.com',
+                'otp': otp,
+                'password': 'newpassword123',
+                'confirm_password': 'newpassword123',
+            })
+            self.assertEqual(reset_resp.status_code, 302)
+            self.assertIn('/login', reset_resp.location)
+
+            # Try logging in with new password
+            login_resp = self.client.post('/login', data={
+                'email': 'rahul@example.com',
+                'password': 'newpassword123',
+            })
+            self.assertEqual(login_resp.status_code, 302)
+            self.assertEqual(login_resp.location, '/')
+        finally:
+            os.environ.pop('ENABLE_DEV_OTP_RESET', None)
 
     def test_profile_page_requires_login_and_updates(self):
         # Create user

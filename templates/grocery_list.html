@@ -21,6 +21,7 @@
             <span class="material-symbols-outlined">shopping_cart</span>
             Generate Shopping List
         </button>
+        <p class="form-feedback" id="groceryFeedback" hidden></p>
     </div>
 </section>
 
@@ -30,7 +31,7 @@
             <h2 id="groceryTitle">Shopping List</h2>
             <p id="grocerySubtitle"></p>
         </div>
-        <button type="button" class="secondary-cta" id="printGroceryBtn" style="width:auto;" onclick="window.print()">
+        <button type="button" class="secondary-cta cta-compact" id="printGroceryBtn" onclick="window.print()">
             <span class="material-symbols-outlined">print</span>
             Print
         </button>
@@ -44,6 +45,19 @@
 document.addEventListener('DOMContentLoaded', function() {
     const planId = new URLSearchParams(window.location.search).get('plan_id');
     const selector = document.getElementById('foodSelector');
+    const groceryBtn = document.getElementById('generateGroceryBtn');
+    const groceryFeedback = document.getElementById('groceryFeedback');
+    const groceryBtnDefault = groceryBtn.innerHTML;
+
+    function showGroceryFeedback(message) {
+        groceryFeedback.textContent = message;
+        groceryFeedback.hidden = false;
+    }
+
+    function clearGroceryFeedback() {
+        groceryFeedback.hidden = true;
+        groceryFeedback.textContent = '';
+    }
 
     fetchFoods();
 
@@ -66,6 +80,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             checkboxHtml += '</div>';
             selector.innerHTML = checkboxHtml;
+            document.querySelectorAll('.grocery-food-check').forEach(check => {
+                check.addEventListener('change', clearGroceryFeedback);
+            });
         } catch (e) {
             selector.innerHTML = '<p class="grocery-hint">Could not load dishes. Please refresh the page.</p>';
         }
@@ -75,18 +92,20 @@ document.addEventListener('DOMContentLoaded', function() {
         generateGroceryList([], planId);
     }
 
-    document.getElementById('generateGroceryBtn').addEventListener('click', function() {
+    groceryBtn.addEventListener('click', function() {
         const checked = Array.from(document.querySelectorAll('.grocery-food-check:checked')).map(c => c.value);
+        clearGroceryFeedback();
         if (checked.length === 0 && !planId) {
-            alert('Please select at least one dish.');
+            showGroceryFeedback('Select at least one dish to build a shopping list.');
+            selector.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
         generateGroceryList(checked, planId);
     });
 
     function generateGroceryList(foodIds, planId) {
-        const btn = document.getElementById('generateGroceryBtn');
-        btn.disabled = true;
+        groceryBtn.disabled = true;
+        groceryBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> Building list...';
 
         const body = {};
         if (foodIds.length > 0) body.food_ids = foodIds;
@@ -99,14 +118,22 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(r => r.json())
         .then(data => {
-            btn.disabled = false;
+            groceryBtn.disabled = false;
+            groceryBtn.innerHTML = groceryBtnDefault;
             if (data.status === 'success') {
+                clearGroceryFeedback();
                 renderGroceryList(data);
                 document.getElementById('groceryResults').style.display = '';
                 document.getElementById('groceryResults').scrollIntoView({behavior: 'smooth'});
+            } else {
+                showGroceryFeedback(data.message || 'Could not generate a shopping list. Try another selection.');
             }
         })
-        .catch(() => { btn.disabled = false; });
+        .catch(() => {
+            groceryBtn.disabled = false;
+            groceryBtn.innerHTML = groceryBtnDefault;
+            showGroceryFeedback('Could not generate a shopping list right now. Please try again.');
+        });
     }
 
     function renderGroceryList(data) {

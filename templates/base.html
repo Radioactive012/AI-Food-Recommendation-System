@@ -16,24 +16,27 @@
 <body class="urban-shell">
     <header class="top-nav">
         <div class="nav-inner">
-            <a href="{{ url_for('index') }}" class="brand-mark">Urban Diner</a>
+            <a href="{{ url_for('index') }}" class="brand-mark" aria-label="Urban Diner home">
+                <span class="brand-icon material-symbols-outlined">restaurant</span>
+                <span>Urban Diner</span>
+            </a>
             <button type="button" class="nav-toggle" id="navToggle" aria-label="Open site menu" aria-expanded="false" aria-controls="siteNav">
                 <span class="material-symbols-outlined">menu</span>
             </button>
             <nav class="desktop-nav" id="siteNav" aria-label="Primary">
-                <a href="{{ url_for('index') }}" class="{% if active_page == 'home' %}active{% endif %}">Discover</a>
-                <a href="{{ url_for('nutrition_dashboard') }}" class="{% if active_page == 'nutrition' %}active{% endif %}">Nutrition</a>
-                <a href="{{ url_for('meal_planner') }}" class="{% if active_page == 'meal_planner' %}active{% endif %}">Meal Planner</a>
-                <a href="{{ url_for('grocery_list_page') }}" class="{% if active_page == 'grocery' %}active{% endif %}">Grocery</a>
-                <a href="{{ url_for('reviews_page') }}" class="{% if active_page == 'reviews' %}active{% endif %}">Reviews</a>
-                <a href="{{ url_for('history') }}" class="{% if active_page == 'history' %}active{% endif %}">Hitlist</a>
+                <a href="{{ url_for('index') }}" class="nav-link {% if active_page == 'home' %}active{% endif %}">Discover</a>
+                <a href="{{ url_for('nutrition_dashboard') }}" class="nav-link {% if active_page == 'nutrition' %}active{% endif %}">Nutrition</a>
+                <a href="{{ url_for('meal_planner') }}" class="nav-link {% if active_page == 'meal_planner' %}active{% endif %}">Meal Planner</a>
+                <a href="{{ url_for('grocery_list_page') }}" class="nav-link {% if active_page == 'grocery' %}active{% endif %}">Grocery</a>
+                <a href="{{ url_for('reviews_page') }}" class="nav-link {% if active_page == 'reviews' %}active{% endif %}">Reviews</a>
+                <a href="{{ url_for('history') }}" class="nav-link {% if active_page == 'history' %}active{% endif %}">Hitlist</a>
                 {% if is_logged_in %}
-                    <a href="{{ url_for('profile') }}" class="{% if active_page == 'profile' %}active{% endif %}">Profile</a>
+                    <a href="{{ url_for('profile') }}" class="nav-link {% if active_page == 'profile' %}active{% endif %}">Profile</a>
                 {% endif %}
                 {% if not is_logged_in %}
-                    <a href="{{ url_for('login') }}" class="{% if active_page == 'login' %}active{% endif %}">Sign In</a>
+                    <a href="{{ url_for('login') }}" class="nav-link {% if active_page == 'login' %}active{% endif %}">Sign In</a>
                 {% else %}
-                    <a href="{{ url_for('logout') }}">Sign Out</a>
+                    <a href="{{ url_for('logout') }}" class="nav-link">Sign Out</a>
                 {% endif %}
             </nav>
             <div class="nav-actions">
@@ -46,10 +49,10 @@
                     <input type="hidden" name="budget" value="500">
                     <input name="search_query" type="search" placeholder="Search dishes...">
                 </form>
-                <a class="icon-button" href="{{ url_for('logout') }}" title="{% if is_logged_in %}Sign out{% else %}Reset preferences{% endif %}">
+                <a class="icon-button" href="{{ url_for('logout') }}" aria-label="{% if is_logged_in %}Sign out{% else %}Reset preferences{% endif %}" title="{% if is_logged_in %}Sign out{% else %}Reset preferences{% endif %}">
                     <span class="material-symbols-outlined">restart_alt</span>
                 </a>
-                <a class="avatar-button" href="{{ url_for('login') if not is_logged_in else url_for('profile') }}" title="{{ current_user.name if is_logged_in else 'Sign in' }}">
+                <a class="avatar-button" href="{{ url_for('login') if not is_logged_in else url_for('profile') }}" aria-label="{{ current_user.name if is_logged_in else 'Sign in' }}" title="{{ current_user.name if is_logged_in else 'Sign in' }}">
                     <span class="material-symbols-outlined">person</span>
                 </a>
             </div>
