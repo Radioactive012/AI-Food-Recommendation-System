@@ -1,0 +1,17 @@
+.env
+.env.*
+.git
+.gitignore
+.vercel
+.venv
+venv
+__pycache__
+*.pyc
+instance
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.zip
+.DS_Store
+Thumbs.db
