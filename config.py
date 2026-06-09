@@ -8,7 +8,7 @@ load_dotenv()
 class Config:
     # Use SECRET_KEY in production. The generated fallback keeps local demos working
     # without committing a reusable session-signing secret.
-    SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-urban-diner-12345'
     
     # Database Configuration
     # Fallback to SQLite if DATABASE_URL is not provided or empty
