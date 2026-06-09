@@ -24,7 +24,9 @@ class Config:
     if db_url.startswith('mysql://'):
         db_url = db_url.replace('mysql://', 'mysql+pymysql://')
     elif db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://')
+        db_url = db_url.replace('postgres://', 'postgresql+pg8000://')
+    elif db_url.startswith('postgresql://'):
+        db_url = db_url.replace('postgresql://', 'postgresql+pg8000://')
         
     SQLALCHEMY_DATABASE_URI = db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
