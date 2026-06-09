@@ -49,8 +49,7 @@ class RecommendationEngine:
             filtered_foods.append(food)
             
         if not filtered_foods:
-            # Fallback if too restrictive
-            filtered_foods = all_foods
+            return []
 
         # Prepare lists for scoring
         scored_foods = []

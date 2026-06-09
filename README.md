@@ -42,7 +42,12 @@ The app works without these for local demos.
 ```text
 SECRET_KEY=replace-with-a-local-secret
 DATABASE_URL=sqlite:///food_recommendation.db
-GEMINI_API_KEY=optional-gemini-api-key
+ADMIN_USERNAME=local-admin-name
+ADMIN_PASSWORD=local-admin-password
+OPENROUTER_API_KEY=optional-openrouter-api-key
+OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+OPENROUTER_SITE_URL=http://127.0.0.1:8080
+OPENROUTER_TIMEOUT_SECONDS=55
 ```
 
 Do not commit a real `.env` file. The repository ignores `.env`, local SQLite databases, virtual environments, and local zip archives.
@@ -50,9 +55,9 @@ Do not commit a real `.env` file. The repository ignores `.env`, local SQLite da
 ## Notes
 
 - Account creation and login use the local SQLite database created in the Flask `instance/` folder.
-- Food recommendations are loaded from `datasets/foods.csv`.
-- The chatbot works without a Gemini key by using the built-in fallback recommender.
-- Admin add, update, and delete actions are currently disabled in database-free testing mode.
+- Food inventory is stored in SQLite and seeded from `datasets/foods.csv` when the foods table is empty.
+- The chatbot uses OpenRouter when `OPENROUTER_API_KEY` is set, otherwise it uses the built-in fallback recommender. Free models can be slow or rate-limited, so `OPENROUTER_TIMEOUT_SECONDS` controls how long the app waits before falling back.
+- Admin inventory add, update, and delete actions require `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
 
 ## Tests
 

@@ -1,7 +1,7 @@
 import os
 import csv
 from werkzeug.security import generate_password_hash
-from models.models import db, Food, Admin, User
+from models.models import db, Food, Admin
 import uuid
 
 def init_db(app):

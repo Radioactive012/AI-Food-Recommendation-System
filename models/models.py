@@ -48,6 +48,24 @@ class Food(db.Model):
     ratings = db.relationship('Rating', backref='food', lazy=True, cascade="all, delete-orphan")
     history = db.relationship('RecommendationHistory', backref='food', lazy=True, cascade="all, delete-orphan")
 
+    def to_dict(self):
+        return {
+            'food_id': self.food_id,
+            'food_name': self.food_name,
+            'cuisine': self.cuisine,
+            'category': self.category,
+            'calories': self.calories,
+            'protein': self.protein,
+            'carbs': self.carbs,
+            'fats': self.fats,
+            'spice_level': self.spice_level,
+            'veg_nonveg': self.veg_nonveg,
+            'price': self.price,
+            'meal_type': self.meal_type,
+            'image_url': self.image_url,
+            'description': self.description,
+        }
+
 class Rating(db.Model):
     __tablename__ = 'ratings'
     

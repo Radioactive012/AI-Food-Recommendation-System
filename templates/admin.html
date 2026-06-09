@@ -5,6 +5,14 @@
 {% block page_title %}Food Inventory Management{% endblock %}
 
 {% block content %}
+<div class="section-heading split" style="margin-bottom: 1.5rem;">
+    <div>
+        <h1>Food Inventory</h1>
+        <p>Add, update, and remove dishes from the live recommendation catalogue.</p>
+    </div>
+    <a href="{{ url_for('admin_logout') }}">Admin logout</a>
+</div>
+
 <div class="glass-panel" style="margin-bottom: 2rem;">
     <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; font-family: 'Outfit';">
         <i class="fa-solid fa-folder-plus" style="color: var(--primary); margin-right: 0.5rem;"></i>

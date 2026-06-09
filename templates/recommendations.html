@@ -55,7 +55,7 @@
                     {% set score = item.score %}
                     {% set explanation = item.explanation %}
                     <article class="dish-card result-card">
-                        <button class="save-button" type="button" title="Save to hitlist">
+                        <button class="save-button" type="button" title="Save to hitlist" data-food-id="{{ food.food_id }}">
                             <span class="material-symbols-outlined">favorite</span>
                         </button>
                         <a href="{{ url_for('direct_food_info') }}?food_id={{ food.food_id }}" class="dish-image">

@@ -126,4 +126,38 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // 5. Save Recommendation to Hitlist
+    const saveButtons = document.querySelectorAll('.save-button[data-food-id]');
+    saveButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const originalTitle = this.getAttribute('title') || 'Save to hitlist';
+            this.disabled = true;
+
+            fetch('/save-food', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ food_id: this.dataset.foodId })
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok || data.status !== 'success') {
+                    throw new Error(data.message || 'Unable to save dish');
+                }
+                this.classList.add('saved');
+                this.setAttribute('title', 'Saved to hitlist');
+            })
+            .catch(err => {
+                console.error(err);
+                this.setAttribute('title', 'Could not save');
+                setTimeout(() => {
+                    this.setAttribute('title', originalTitle);
+                    this.disabled = false;
+                }, 1600);
+            });
+        });
+    });
 });

@@ -21,6 +21,9 @@ instance/
 *.sqlite3
 *.db-journal
 
+# Vercel local project metadata
+.vercel/
+
 # Local archives and exported design drops
 *.zip
 

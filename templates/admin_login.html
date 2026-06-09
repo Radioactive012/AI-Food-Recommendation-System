@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Urban Diner - Admin Sign In{% endblock %}
+
+{% block content %}
+<section class="auth-shell">
+    <div class="auth-visual">
+        <span class="section-kicker">Inventory desk</span>
+        <h1>Admin access.</h1>
+        <p>Manage dishes, prices, nutrition, and catalogue details from one protected panel.</p>
+    </div>
+
+    <div class="auth-card">
+        <div class="section-heading">
+            <h1>Admin Sign In</h1>
+            {% if setup_missing %}
+                <p>Set ADMIN_USERNAME and ADMIN_PASSWORD in your environment, then restart the app.</p>
+            {% else %}
+                <p>Use the local admin credentials configured for this project.</p>
+            {% endif %}
+        </div>
+
+        {% if not setup_missing %}
+            <form action="{{ url_for('admin_login', next=request.args.get('next')) }}" method="POST" class="auth-form">
+                <div class="preference-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" class="form-input" autocomplete="username" required>
+                </div>
+
+                <div class="preference-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-input" autocomplete="current-password" required>
+                </div>
+
+                <button type="submit" class="primary-cta">
+                    <span class="material-symbols-outlined">admin_panel_settings</span>
+                    Sign In
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
