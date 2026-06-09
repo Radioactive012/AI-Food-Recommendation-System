@@ -20,9 +20,11 @@ class Config:
         else:
             db_url = 'sqlite:///food_recommendation.db'
     
-    # SQLAlchemy connection string adjustment for PyMySQL
+    # SQLAlchemy connection string adjustments
     if db_url.startswith('mysql://'):
         db_url = db_url.replace('mysql://', 'mysql+pymysql://')
+    elif db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://')
         
     SQLALCHEMY_DATABASE_URI = db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
