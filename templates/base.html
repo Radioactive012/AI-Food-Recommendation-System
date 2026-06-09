@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Urban Diner - AI-powered food recommendations matched to your taste, diet, and mood.">
     <title>{% block title %}Urban Diner{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
@@ -16,10 +17,16 @@
     <header class="top-nav">
         <div class="nav-inner">
             <a href="{{ url_for('index') }}" class="brand-mark">Urban Diner</a>
-            <nav class="desktop-nav" aria-label="Primary">
+            <button type="button" class="nav-toggle" id="navToggle" aria-label="Open site menu" aria-expanded="false" aria-controls="siteNav">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+            <nav class="desktop-nav" id="siteNav" aria-label="Primary">
                 <a href="{{ url_for('index') }}" class="{% if active_page == 'home' %}active{% endif %}">Discover</a>
+                <a href="{{ url_for('nutrition_dashboard') }}" class="{% if active_page == 'nutrition' %}active{% endif %}">Nutrition</a>
+                <a href="{{ url_for('meal_planner') }}" class="{% if active_page == 'meal_planner' %}active{% endif %}">Meal Planner</a>
+                <a href="{{ url_for('grocery_list_page') }}" class="{% if active_page == 'grocery' %}active{% endif %}">Grocery</a>
+                <a href="{{ url_for('reviews_page') }}" class="{% if active_page == 'reviews' %}active{% endif %}">Reviews</a>
                 <a href="{{ url_for('history') }}" class="{% if active_page == 'history' %}active{% endif %}">Hitlist</a>
-                <a href="{{ url_for('index') }}#featured">About</a>
                 {% if not is_logged_in %}
                     <a href="{{ url_for('login') }}" class="{% if active_page == 'login' %}active{% endif %}">Sign In</a>
                 {% endif %}
@@ -61,20 +68,22 @@
         {% block content %}{% endblock %}
     </main>
 
-    <nav class="mobile-nav" aria-label="Mobile primary">
-        <a href="{{ url_for('index') }}" class="{% if active_page == 'home' %}active{% endif %}">
-            <span class="material-symbols-outlined">mood</span>
-            <span>Discover</span>
-        </a>
-        <a href="{{ url_for('history') }}" class="{% if active_page == 'history' %}active{% endif %}">
-            <span class="material-symbols-outlined">local_fire_department</span>
-            <span>Hitlist</span>
-        </a>
-        <a href="{{ url_for('logout') }}">
-            <span class="material-symbols-outlined">restart_alt</span>
-            <span>{% if is_logged_in %}Sign out{% else %}Reset{% endif %}</span>
-        </a>
-    </nav>
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <strong>Urban Diner</strong>
+                <p>AI-powered food recommendations for your taste, diet, and goals.</p>
+            </div>
+            <nav class="footer-nav" aria-label="Footer">
+                <a href="{{ url_for('index') }}">Discover</a>
+                <a href="{{ url_for('nutrition_dashboard') }}">Nutrition</a>
+                <a href="{{ url_for('meal_planner') }}">Meal Planner</a>
+                <a href="{{ url_for('grocery_list_page') }}">Grocery List</a>
+                <a href="{{ url_for('reviews_page') }}">Reviews</a>
+                <a href="{{ url_for('history') }}">Hitlist</a>
+            </nav>
+        </div>
+    </footer>
 
     <div class="chatbot-widget" id="chatbotWidget">
         <button class="chatbot-trigger" id="chatbotTrigger" title="Chat with Urban Diner">

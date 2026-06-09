@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Urban Diner - Nutrition Dashboard{% endblock %}
+
+{% block content %}
+<section class="content-section">
+    <div class="section-heading">
+        <span class="section-kicker">Nutritional Analysis</span>
+        <h1>Nutrition Dashboard</h1>
+        <p>Detailed nutritional breakdown across our entire food catalog.</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="nutrition-summary-grid">
+        <div class="nutrition-summary-card">
+            <span class="material-symbols-outlined">local_fire_department</span>
+            <div>
+                <strong>{{ avg_cal }}</strong>
+                <span>Avg Calories</span>
+            </div>
+        </div>
+        <div class="nutrition-summary-card">
+            <span class="material-symbols-outlined">fitness_center</span>
+            <div>
+                <strong>{{ avg_protein }}g</strong>
+                <span>Avg Protein</span>
+            </div>
+        </div>
+        <div class="nutrition-summary-card">
+            <span class="material-symbols-outlined">grain</span>
+            <div>
+                <strong>{{ avg_carbs }}g</strong>
+                <span>Avg Carbs</span>
+            </div>
+        </div>
+        <div class="nutrition-summary-card">
+            <span class="material-symbols-outlined">water_drop</span>
+            <div>
+                <strong>{{ avg_fats }}g</strong>
+                <span>Avg Fats</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Vitamins & Minerals -->
+<section class="content-section">
+    <div class="section-heading">
+        <h2>Vitamins & Minerals</h2>
+        <p>Key micronutrients inferred from each dish's ingredients.</p>
+    </div>
+    <div class="vitamin-bucket-grid">
+        {% for label, items in vitamin_buckets.items() %}
+        {% if items %}
+        <div class="vitamin-bucket">
+            <strong>{{ label }}</strong>
+            <span>{{ items | length }} dish{% if items | length != 1 %}es{% endif %}</span>
+            <em>{{ items[:3] | map(attribute='food_name') | join(', ') }}{% if items | length > 3 %}…{% endif %}</em>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Cuisine Comparison -->
+<section class="content-section">
+    <div class="section-heading">
+        <h2>Nutrition by Cuisine</h2>
+        <p>Average macros compared across cuisine types.</p>
+    </div>
+    <div class="cuisine-chart-container">
+        <canvas id="cuisineChart" height="300"></canvas>
+    </div>
+</section>
+
+<!-- Health Buckets -->
+<section class="content-section">
+    <div class="section-heading">
+        <h2>Quick Health Filters</h2>
+        <p>Tap a category to see dishes that match.</p>
+    </div>
+    <div class="health-bucket-grid">
+        <div class="health-bucket" id="bucketLowCal">
+            <span class="material-symbols-outlined">monitor_weight</span>
+            <strong>Low Calorie</strong>
+            <span>≤ 300 kcal</span>
+            <em>{{ low_cal | length }} dishes</em>
+        </div>
+        <div class="health-bucket" id="bucketHighProtein">
+            <span class="material-symbols-outlined">fitness_center</span>
+            <strong>High Protein</strong>
+            <span>≥ 20g protein</span>
+            <em>{{ high_protein | length }} dishes</em>
+        </div>
+        <div class="health-bucket" id="bucketLowCarb">
+            <span class="material-symbols-outlined">bloodtype</span>
+            <strong>Low Carb</strong>
+            <span>≤ 30g carbs</span>
+            <em>{{ low_carb | length }} dishes</em>
+        </div>
+        <div class="health-bucket" id="bucketLowFat">
+            <span class="material-symbols-outlined">cardiology</span>
+            <strong>Low Fat</strong>
+            <span>≤ 10g fats</span>
+            <em>{{ low_fat | length }} dishes</em>
+        </div>
+    </div>
+</section>
+
+<!-- Per-food table -->
+<section class="content-section">
+    <div class="section-heading">
+        <h2>All Foods — Nutrition Table</h2>
+    </div>
+    <div class="nutrition-table-wrap">
+        <table class="nutrition-table" id="nutritionTable">
+            <thead>
+                <tr>
+                    <th>Dish</th>
+                    <th>Cuisine</th>
+                    <th>Category</th>
+                    <th>Calories</th>
+                    <th>Protein</th>
+                    <th>Carbs</th>
+                    <th>Fats</th>
+                    <th>Vitamins</th>
+                    <th>Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for food in foods %}
+                <tr>
+                    <td><a href="{{ url_for('direct_food_info') }}?food_id={{ food.food_id }}">{{ food.food_name }}</a></td>
+                    <td>{{ food.cuisine }}</td>
+                    <td>{{ food.category }}</td>
+                    <td>{{ food.calories }} kcal</td>
+                    <td>{{ food.protein | round(1) }}g</td>
+                    <td>{{ food.carbs | round(1) }}g</td>
+                    <td>{{ food.fats | round(1) }}g</td>
+                    <td>
+                        {% for vitamin in food_vitamins[food.food_id] %}
+                        <span class="vitamin-tag">{{ vitamin }}</span>
+                        {% else %}
+                        <span class="vitamin-tag muted">—</span>
+                        {% endfor %}
+                    </td>
+                    <td>₹{{ food.price | int }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Cuisine chart
+    const cuisineData = {{ cuisine_stats | tojson }};
+    const labels = Object.keys(cuisineData);
+    const ctx = document.getElementById('cuisineChart').getContext('2d');
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Avg Calories',
+                    data: labels.map(l => cuisineData[l].avg_cal),
+                    backgroundColor: 'rgba(13, 43, 34, 0.75)',
+                    borderRadius: 6,
+                },
+                {
+                    label: 'Avg Protein (g)',
+                    data: labels.map(l => cuisineData[l].avg_protein),
+                    backgroundColor: 'rgba(47, 111, 86, 0.75)',
+                    borderRadius: 6,
+                },
+                {
+                    label: 'Avg Carbs (g)',
+                    data: labels.map(l => cuisineData[l].avg_carbs),
+                    backgroundColor: 'rgba(173, 206, 192, 0.85)',
+                    borderRadius: 6,
+                },
+                {
+                    label: 'Avg Fats (g)',
+                    data: labels.map(l => cuisineData[l].avg_fats),
+                    backgroundColor: 'rgba(112, 91, 50, 0.65)',
+                    borderRadius: 6,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { family: 'Inter', weight: 600 }, padding: 16 } }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Health bucket click → scroll to table and highlight
+    document.querySelectorAll('.health-bucket').forEach(bucket => {
+        bucket.addEventListener('click', function() {
+            document.getElementById('nutritionTable').scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+});
+</script>
+{% endblock %}

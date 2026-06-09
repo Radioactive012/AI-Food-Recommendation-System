@@ -12,7 +12,7 @@
         </div>
         <div class="hero-search">
             <span class="material-symbols-outlined">search</span>
-            <input type="text" id="searchQuery" name="search_query" placeholder="Find cuisines, dishes, or ingredients..." value="{{ user_profile.search_query or '' }}">
+            <input type="text" id="searchQuery" name="search_query" placeholder="Try: 'healthy vegetarian Italian dinner under 500 calories'" value="{{ user_profile.search_query or '' }}">
         </div>
         <input type="hidden" id="moodInput" name="mood" value="{{ user_profile.mood_preference or 'Neutral' }}">
         <div class="chip-row center">
@@ -50,8 +50,31 @@
                 <strong>Maintain</strong>
                 <small>Steady macros, satisfying</small>
             </button>
+            <button type="button" class="health-card objective-card {% if user_profile.health_goal == 'Diabetes-Friendly' %}selected{% endif %}" data-value="Diabetes-Friendly">
+                <span class="material-symbols-outlined">bloodtype</span>
+                <strong>Diabetes-Friendly</strong>
+                <small>Low carb, blood sugar safe</small>
+            </button>
+            <button type="button" class="health-card objective-card {% if user_profile.health_goal == 'Heart-Healthy' %}selected{% endif %}" data-value="Heart-Healthy">
+                <span class="material-symbols-outlined">cardiology</span>
+                <strong>Heart-Healthy</strong>
+                <small>Low fat, cardiovascular care</small>
+            </button>
         </div>
     </section>
+
+    {% if user_allergies %}
+    <section class="content-section">
+        <div class="allergy-banner">
+            <span class="material-symbols-outlined">shield</span>
+            <div>
+                <strong>Allergy Protection Active</strong>
+                <p>Excluding foods with: {{ user_allergies | join(', ') }}</p>
+            </div>
+            <a href="{{ url_for('register') }}" class="allergy-edit-link">Edit</a>
+        </div>
+    </section>
+    {% endif %}
 
     <section class="content-section preference-panel">
         <div class="section-heading">
@@ -96,6 +119,19 @@
                 <input type="range" id="budgetSlider" name="budget" min="50" max="1000" value="{{ user_profile.budget | default(500) | int }}" class="range-slider">
             </div>
         </div>
+
+        <!-- Allergy Quick-Set -->
+        <div class="preference-group" style="margin-top: 16px;">
+            <label>Food Allergies & Restrictions</label>
+            <div class="chip-row" id="allergyChips">
+                {% for allergen in all_allergens %}
+                    <button type="button" class="allergy-chip pill-chip {% if allergen in user_allergies %}selected{% endif %}" data-allergen="{{ allergen }}">
+                        {{ allergen }}
+                    </button>
+                {% endfor %}
+            </div>
+        </div>
+
         <button type="submit" class="primary-cta">
             <span class="material-symbols-outlined">restaurant_menu</span>
             Find My Food
@@ -132,9 +168,42 @@
                         <span>{{ food.protein | round | int }}g Protein</span>
                         <span>{{ food.calories }} kcal</span>
                     </div>
+                    {% if food.allergens %}
+                    <div class="tag-row allergen-tags">
+                        {% for allergen in food.allergens.replace('|', ',').split(',') %}
+                            {% if allergen.strip() %}
+                            <span class="allergen-tag">⚠ {{ allergen.strip() }}</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
             </article>
         {% endfor %}
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Allergy chip toggle + save
+    const allergyChips = document.querySelectorAll('.allergy-chip');
+    allergyChips.forEach(chip => {
+        chip.addEventListener('click', function(e) {
+            e.preventDefault();
+            this.classList.toggle('selected');
+            // Collect selected allergies
+            const selected = Array.from(document.querySelectorAll('.allergy-chip.selected'))
+                .map(c => c.dataset.allergen);
+            // Save via API
+            fetch('/api/allergies', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({allergies: selected})
+            });
+        });
+    });
+});
+</script>
 {% endblock %}

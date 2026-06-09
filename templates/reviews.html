@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Urban Diner - Reviews{% endblock %}
+
+{% block content %}
+<section class="content-section">
+    <div class="section-heading">
+        <span class="section-kicker">Community</span>
+        <h1>Ratings & Reviews</h1>
+        <p>See what people are saying about the dishes.</p>
+    </div>
+
+    {% if review_items %}
+    <div class="reviews-feed">
+        {% for item in review_items %}
+        <article class="review-card" data-source="{{ item.source }}" data-review-id="{{ item.review_id | default('') }}" data-session-index="{{ item.session_index | default('') }}">
+            <div class="review-header">
+                <a href="{{ url_for('direct_food_info') }}?food_id={{ item.food.food_id }}" class="review-food-image">
+                    {% if item.food.image_url %}
+                        <img src="{{ item.food.image_url }}" alt="{{ item.food.food_name }}" loading="lazy">
+                    {% else %}
+                        <span class="material-symbols-outlined">restaurant</span>
+                    {% endif %}
+                </a>
+                <div class="review-food-info">
+                    <h3><a href="{{ url_for('direct_food_info') }}?food_id={{ item.food.food_id }}">{{ item.food.food_name }}</a></h3>
+                    <span class="review-meta">{{ item.food.cuisine }} · {{ item.food.category }} · ₹{{ item.food.price | int }}</span>
+                </div>
+                {% if item.can_manage %}
+                <div class="review-actions">
+                    <button type="button" class="review-action-btn edit-review-btn" title="Edit review">
+                        <span class="material-symbols-outlined">edit</span>
+                    </button>
+                    <button type="button" class="review-action-btn delete-review-btn" title="Delete review">
+                        <span class="material-symbols-outlined">delete</span>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            <div class="review-body">
+                <div class="review-stars">
+                    {% for i in range(5) %}
+                        <span class="material-symbols-outlined {% if i < item.rating.rating %}star-filled{% endif %}">star</span>
+                    {% endfor %}
+                    <span class="review-author">by {{ item.user_name }}</span>
+                </div>
+                {% if item.rating.review %}
+                    <p class="review-text">"{{ item.rating.review }}"</p>
+                {% endif %}
+                <span class="review-date">{{ item.rating.created_at.strftime('%b %d, %Y') if item.rating.created_at else '' }}</span>
+            </div>
+            {% if item.can_manage %}
+            <form class="review-edit-form" hidden>
+                <label>
+                    Rating
+                    <select name="rating">
+                        {% for score in range(5, 0, -1) %}
+                        <option value="{{ score }}" {% if score == item.rating.rating %}selected{% endif %}>{{ score }} star{% if score != 1 %}s{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    Review
+                    <textarea name="review" rows="3" placeholder="Share your experience...">{{ item.rating.review or '' }}</textarea>
+                </label>
+                <div class="review-edit-actions">
+                    <button type="submit" class="primary-cta" style="width:auto;">Save</button>
+                    <button type="button" class="secondary-cta cancel-edit-btn" style="width:auto;">Cancel</button>
+                </div>
+            </form>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <span class="material-symbols-outlined">rate_review</span>
+        <h2>No reviews yet</h2>
+        <p>Get recommendations and rate dishes to see reviews appear here.</p>
+        <a href="{{ url_for('index') }}" class="primary-cta">Discover Food</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.review-card').forEach(card => {
+        const editBtn = card.querySelector('.edit-review-btn');
+        const deleteBtn = card.querySelector('.delete-review-btn');
+        const editForm = card.querySelector('.review-edit-form');
+        const reviewBody = card.querySelector('.review-body');
+        const cancelBtn = card.querySelector('.cancel-edit-btn');
+
+        if (editBtn && editForm) {
+            editBtn.addEventListener('click', function() {
+                editForm.hidden = false;
+                reviewBody.hidden = true;
+            });
+        }
+
+        if (cancelBtn && editForm) {
+            cancelBtn.addEventListener('click', function() {
+                editForm.hidden = true;
+                reviewBody.hidden = false;
+            });
+        }
+
+        if (editForm) {
+            editForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const payload = {
+                    rating: editForm.querySelector('[name="rating"]').value,
+                    review: editForm.querySelector('[name="review"]').value.trim(),
+                };
+                const url = card.dataset.source === 'db'
+                    ? `/api/reviews/${card.dataset.reviewId}`
+                    : `/api/reviews/session/${card.dataset.sessionIndex}`;
+
+                fetch(url, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload),
+                })
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok || data.status !== 'success') {
+                        alert(data.message || 'Could not update review.');
+                        return;
+                    }
+                    window.location.reload();
+                })
+                .catch(() => alert('Could not update review.'));
+            });
+        }
+
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                if (!confirm('Delete this review?')) return;
+
+                const url = card.dataset.source === 'db'
+                    ? `/api/reviews/${card.dataset.reviewId}`
+                    : `/api/reviews/session/${card.dataset.sessionIndex}`;
+
+                fetch(url, { method: 'DELETE' })
+                    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                    .then(({ ok, data }) => {
+                        if (!ok || data.status !== 'success') {
+                            alert(data.message || 'Could not delete review.');
+                            return;
+                        }
+                        card.remove();
+                    })
+                    .catch(() => alert('Could not delete review.'));
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

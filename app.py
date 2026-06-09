@@ -8,8 +8,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 from database.db_manager import init_db
-from ml.similarity_model import RecommendationEngine
-from models.models import db, User, Food
+from ml.similarity_model import RecommendationEngine, parse_natural_language_search, apply_nl_constraints
+from models.models import db, User, Food, Rating, MealPlan, MealPlanItem
 import requests
 import json
 
@@ -40,6 +40,8 @@ SEARCH_ALIASES = {
     'snack': {'snack', 'snacks'},
 }
 
+ALL_ALLERGENS = ['Gluten', 'Dairy', 'Nuts', 'Peanuts', 'Eggs', 'Soy', 'Fish', 'Shellfish', 'Sesame']
+
 
 def get_foods():
     return Food.query.order_by(Food.food_name.asc()).all()
@@ -51,6 +53,16 @@ def get_food(food_id):
     return db.session.get(Food, food_id)
 
 
+def get_user_allergies():
+    """Get allergies from logged-in user or session."""
+    user_id = session.get('user_id')
+    if user_id:
+        user = db.session.get(User, user_id)
+        if user:
+            return user.get_allergies_list()
+    return session.get('allergies', [])
+
+
 def add_to_history(food_id):
     history = session.get('history', [])
     existing = next((item for item in history if item.get('food_id') == food_id), None)
@@ -60,6 +72,60 @@ def add_to_history(food_id):
         history.append({'food_id': food_id, 'timestamp': datetime.now().isoformat()})
     session['history'] = history[-20:]
     session.modified = True
+
+
+VITAMIN_KEYWORDS = {
+    'Vit C': ('tomato', 'pepper', 'lemon', 'lime', 'berry', 'berries', 'spinach', 'broccoli', 'basil', 'parsley', 'orange', 'avocado'),
+    'Iron': ('spinach', 'lentil', 'lentils', 'dal', 'chickpea', 'kidney bean', 'beef', 'paneer', 'tofu', 'quinoa'),
+    'Calcium': ('milk', 'cheese', 'yogurt', 'paneer', 'cream', 'mozzarella', 'parmesan', 'butter', 'ghee', 'egg'),
+    'Vit D': ('egg', 'eggs', 'salmon', 'tuna', 'fish'),
+    'Vit A': ('carrot', 'spinach', 'sweet potato', 'egg', 'eggs', 'butter', 'cheese', 'tomato'),
+    'Vit B12': ('egg', 'eggs', 'chicken', 'beef', 'salmon', 'tuna', 'fish', 'milk', 'cheese'),
+    'Folate': ('spinach', 'lentil', 'lentils', 'dal', 'chickpea', 'broccoli', 'avocado'),
+}
+
+
+def get_food_vitamins(food):
+    """Estimate notable vitamins/minerals from ingredients for dashboard display."""
+    ing = f"{food.ingredients or ''} {food.description or ''}".lower()
+    vitamins = []
+    for label, keywords in VITAMIN_KEYWORDS.items():
+        if any(keyword in ing for keyword in keywords):
+            vitamins.append(label)
+    if food.category == 'Breakfast' and 'oatmeal' in ing and 'Iron' not in vitamins:
+        vitamins.append('Iron')
+    if food.veg_nonveg == 'Veg' and 'Fiber' not in vitamins and len(vitamins) < 4:
+        vitamins.append('Fiber')
+    return vitamins[:4]
+
+
+def learn_preference(food):
+    """Track cuisine/category frequency for long-term preference learning."""
+    pref_data = session.get('learned_prefs', {'cuisines': {}, 'categories': {}, 'diet_counts': {}})
+    cuisine = food.cuisine
+    category = food.category
+    diet = food.veg_nonveg
+    pref_data['cuisines'][cuisine] = pref_data['cuisines'].get(cuisine, 0) + 1
+    pref_data['categories'][category] = pref_data['categories'].get(category, 0) + 1
+    pref_data['diet_counts'][diet] = pref_data['diet_counts'].get(diet, 0) + 1
+    session['learned_prefs'] = pref_data
+    session.modified = True
+
+    user_id = session.get('user_id')
+    if user_id:
+        user = db.session.get(User, user_id)
+        if user:
+            user.learned_prefs = json.dumps(pref_data)
+            db.session.commit()
+
+
+def get_top_learned_preference(pref_type):
+    """Get the most frequent cuisine or category from learned preferences."""
+    pref_data = session.get('learned_prefs', {})
+    counts = pref_data.get(pref_type, {})
+    if not counts:
+        return None
+    return max(counts, key=counts.get)
 
 
 def admin_credentials_configured():
@@ -136,6 +202,7 @@ def searchable_food_text(food):
         food.spice_level,
         f'{food.spice_level} spice',
         food.description or '',
+        food.ingredients or '',
         *macro_tags,
     ]
     if food.veg_nonveg == 'Veg':
@@ -185,15 +252,28 @@ def inject_user():
         current_user = db.session.get(User, user_id)
     return dict(
         current_user=current_user,
-        is_logged_in=current_user is not None
+        is_logged_in=current_user is not None,
+        all_allergens=ALL_ALLERGENS,
+        user_allergies=get_user_allergies(),
+        get_food_vitamins=get_food_vitamins,
     )
 
 # --- ROUTES ---
+
+@app.route('/favicon.ico')
+def favicon():
+    return redirect(url_for('static', filename='favicon.svg'))
 
 @app.route('/')
 def index():
     # If the user has preferences saved in session, pass them.
     user_profile = session.get('preferences', {})
+
+    # Apply learned preference hints
+    top_cuisine = get_top_learned_preference('cuisines')
+    if top_cuisine and not user_profile.get('cuisine_preference'):
+        user_profile['learned_cuisine'] = top_cuisine
+
     foods = get_foods()
     return render_template(
         'index.html',
@@ -223,6 +303,12 @@ def login():
             'budget': 500,
             'search_query': ''
         }
+        session['allergies'] = user.get_allergies_list()
+        if user.learned_prefs:
+            try:
+                session['learned_prefs'] = json.loads(user.learned_prefs)
+            except (TypeError, ValueError):
+                pass
         flash(f'Welcome back, {user.name}.', 'success')
         return redirect(url_for('index'))
 
@@ -249,6 +335,10 @@ def register():
             except ValueError:
                 return None
 
+        # Collect allergies from form
+        selected_allergies = request.form.getlist('allergies')
+        allergies_str = ','.join(selected_allergies) if selected_allergies else None
+
         user = User(
             name=name,
             email=email,
@@ -258,7 +348,8 @@ def register():
             diet_type=request.form.get('diet_type') or 'Veg',
             spice_preference=request.form.get('spice_preference') or 'Medium',
             health_goal=request.form.get('health_goal') or 'Healthy Eating',
-            mood_preference=request.form.get('mood_preference') or 'Neutral'
+            mood_preference=request.form.get('mood_preference') or 'Neutral',
+            allergies=allergies_str,
         )
         db.session.add(user)
         db.session.commit()
@@ -273,6 +364,7 @@ def register():
             'budget': 500,
             'search_query': ''
         }
+        session['allergies'] = user.get_allergies_list()
         flash('Account created. Your taste profile is ready.', 'success')
         return redirect(url_for('index'))
 
@@ -301,6 +393,11 @@ def get_recommendation_results():
 
     search_query = request.form.get('search_query', '').strip()
 
+    if not cuisine:
+        learned_cuisine = get_top_learned_preference('cuisines')
+        if learned_cuisine:
+            cuisine = learned_cuisine
+
     # Save these as current preferences in session
     session['preferences'] = {
         'diet_type': diet,
@@ -322,6 +419,14 @@ def get_recommendation_results():
             self.rating = rating
 
     user_ratings = [SessionRating(r['food_id'], r['rating']) for r in session.get('ratings', [])]
+    session_food_ids = {r.food_id for r in user_ratings}
+    user_id = session.get('user_id')
+    if user_id:
+        for db_rating in Rating.query.filter_by(user_id=user_id).all():
+            if db_rating.food_id not in session_food_ids:
+                user_ratings.append(SessionRating(db_rating.food_id, db_rating.rating))
+
+    all_ratings = Rating.query.all()
 
     # Construct user profile dictionary for the engine
     user_profile = {
@@ -334,23 +439,43 @@ def get_recommendation_results():
         'age': 25
     }
 
-    # Strict search: if a query is present, only query matches continue.
-    if search_query:
+    # Try NL search first — if query looks like natural language
+    nl_constraints = {}
+    if search_query and len(search_query.split()) >= 3:
+        nl_constraints = parse_natural_language_search(search_query)
+        if nl_constraints:
+            all_foods = apply_nl_constraints(all_foods, nl_constraints)
+            # Override form values with NL-extracted values
+            if 'diet' in nl_constraints:
+                user_profile['diet_type'] = nl_constraints['diet']
+            if 'cuisine' in nl_constraints:
+                user_profile['cuisine_preference'] = nl_constraints['cuisine']
+            if 'spice' in nl_constraints:
+                user_profile['spice_preference'] = nl_constraints['spice']
+            if 'max_budget' in nl_constraints:
+                user_profile['budget'] = nl_constraints['max_budget']
+
+    # Fallback: keyword search if NL didn't extract constraints or query is short
+    if search_query and not nl_constraints:
         all_foods = [food for food in all_foods if food_matches_search(food, search_query)]
+
+    user_allergies = get_user_allergies()
 
     # Calculate Recommendations
     suggestions = engine.get_recommendations(
         user_profile=user_profile,
         all_foods=all_foods,
         rating_history=user_ratings,
-        limit=6
+        limit=6,
+        user_allergies=user_allergies,
+        all_ratings=all_ratings,
     )
 
     return render_template(
         'recommendations.html',
         suggestions=suggestions,
         user_profile=session.get('preferences', {}),
-        active_page='hitlist'
+        active_page='home'
     )
 
 @app.route('/history')
@@ -401,14 +526,33 @@ def submit_rating():
         return redirect(url_for('index'))
 
     ratings = session.get('ratings', [])
-    ratings.append({
-        'food_id': food_id,
-        'rating': rating_int,
-        'review': review
-    })
+    existing_idx = next((i for i, r in enumerate(ratings) if r.get('food_id') == food_id), None)
+    entry = {'food_id': food_id, 'rating': rating_int, 'review': review}
+    if existing_idx is not None:
+        ratings[existing_idx] = entry
+    else:
+        ratings.append(entry)
     session['ratings'] = ratings
     add_to_history(food_id)
+    learn_preference(food)
     session.modified = True
+
+    user_id = session.get('user_id')
+    if user_id:
+        db_rating = Rating.query.filter_by(user_id=user_id, food_id=food_id).order_by(
+            Rating.created_at.desc()
+        ).first()
+        if db_rating:
+            db_rating.rating = rating_int
+            db_rating.review = review if review else None
+        else:
+            db.session.add(Rating(
+                user_id=user_id,
+                food_id=food_id,
+                rating=rating_int,
+                review=review if review else None,
+            ))
+        db.session.commit()
 
     if request.is_json:
         return jsonify({'status': 'success', 'message': 'Thank you for rating!'})
@@ -425,6 +569,7 @@ def direct_food_info():
         return redirect(url_for('index'))
 
     add_to_history(food.food_id)
+    learn_preference(food)
 
     dummy_item = {
         'food': food,
@@ -435,8 +580,368 @@ def direct_food_info():
         'recommendations.html',
         suggestions=[dummy_item],
         user_profile=session.get('preferences', {}),
-        active_page='hitlist'
+        active_page='home'
     )
+
+# --- NUTRITION DASHBOARD ---
+
+@app.route('/nutrition')
+def nutrition_dashboard():
+    foods = get_foods()
+    # Gather stats for the dashboard
+    avg_cal = sum(f.calories for f in foods) / len(foods) if foods else 0
+    avg_protein = sum(f.protein for f in foods) / len(foods) if foods else 0
+    avg_carbs = sum(f.carbs for f in foods) / len(foods) if foods else 0
+    avg_fats = sum(f.fats for f in foods) / len(foods) if foods else 0
+
+    # Categorize foods by nutrition buckets
+    low_cal = [f for f in foods if f.calories <= 300]
+    high_protein = [f for f in foods if f.protein >= 20]
+    low_carb = [f for f in foods if f.carbs <= 30]
+    low_fat = [f for f in foods if f.fats <= 10]
+
+    # Per-cuisine averages
+    cuisine_stats = {}
+    for food in foods:
+        if food.cuisine not in cuisine_stats:
+            cuisine_stats[food.cuisine] = {'count': 0, 'cal': 0, 'protein': 0, 'carbs': 0, 'fats': 0}
+        cs = cuisine_stats[food.cuisine]
+        cs['count'] += 1
+        cs['cal'] += food.calories
+        cs['protein'] += food.protein
+        cs['carbs'] += food.carbs
+        cs['fats'] += food.fats
+    for cuisine, cs in cuisine_stats.items():
+        n = cs['count']
+        cs['avg_cal'] = round(cs['cal'] / n)
+        cs['avg_protein'] = round(cs['protein'] / n, 1)
+        cs['avg_carbs'] = round(cs['carbs'] / n, 1)
+        cs['avg_fats'] = round(cs['fats'] / n, 1)
+
+    food_vitamins = {food.food_id: get_food_vitamins(food) for food in foods}
+    vitamin_buckets = {label: [] for label in VITAMIN_KEYWORDS}
+    vitamin_buckets['Fiber'] = []
+    for food in foods:
+        for vitamin in food_vitamins[food.food_id]:
+            vitamin_buckets.setdefault(vitamin, []).append(food)
+
+    return render_template(
+        'nutrition_dashboard.html',
+        foods=foods,
+        food_vitamins=food_vitamins,
+        vitamin_buckets=vitamin_buckets,
+        avg_cal=round(avg_cal),
+        avg_protein=round(avg_protein, 1),
+        avg_carbs=round(avg_carbs, 1),
+        avg_fats=round(avg_fats, 1),
+        low_cal=low_cal,
+        high_protein=high_protein,
+        low_carb=low_carb,
+        low_fat=low_fat,
+        cuisine_stats=cuisine_stats,
+        active_page='nutrition'
+    )
+
+# --- MEAL PLANNER ---
+
+@app.route('/meal-planner')
+def meal_planner():
+    return render_template('meal_planner.html', active_page='meal_planner')
+
+@app.route('/api/generate-meal-plan', methods=['POST'])
+def generate_meal_plan_api():
+    data = request.json or {}
+    days = min(int(data.get('days', 7)), 7)
+    health_goal = data.get('health_goal', session.get('preferences', {}).get('health_goal', 'Healthy Eating'))
+    diet_type = data.get('diet_type', session.get('preferences', {}).get('diet_type', 'Veg'))
+
+    user_profile = {
+        'diet_type': diet_type,
+        'health_goal': health_goal,
+    }
+
+    user_allergies = get_user_allergies()
+    all_foods = get_foods()
+
+    plan = engine.generate_meal_plan(all_foods, user_profile, days=days, user_allergies=user_allergies)
+
+    # Save to DB if logged in
+    user_id = session.get('user_id')
+    meal_plan = MealPlan(
+        user_id=user_id,
+        session_id=session.get('_id', ''),
+        plan_name=f'{diet_type} {health_goal} Plan',
+    )
+    db.session.add(meal_plan)
+    db.session.flush()  # Ensure plan_id is populated before creating items
+
+    result = []
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    for day_data in plan:
+        day_idx = day_data['day_index']
+        day_result = {'day': day_names[day_idx], 'day_index': day_idx, 'slots': {}, 'total_calories': 0, 'total_protein': 0}
+        for slot_name, food in day_data['slots'].items():
+            day_result['slots'][slot_name] = {
+                'food_id': food.food_id,
+                'food_name': food.food_name,
+                'cuisine': food.cuisine,
+                'calories': food.calories,
+                'protein': float(food.protein),
+                'carbs': float(food.carbs),
+                'fats': float(food.fats),
+                'price': float(food.price),
+                'image_url': food.image_url or '',
+                'veg_nonveg': food.veg_nonveg,
+            }
+            day_result['total_calories'] += food.calories
+            day_result['total_protein'] += food.protein
+
+            item = MealPlanItem(
+                plan_id=meal_plan.plan_id,
+                food_id=food.food_id,
+                day_index=day_idx,
+                slot=slot_name,
+            )
+            db.session.add(item)
+
+        day_result['total_protein'] = round(day_result['total_protein'], 1)
+        result.append(day_result)
+
+    db.session.commit()
+
+    return jsonify({'status': 'success', 'plan': result, 'plan_id': meal_plan.plan_id})
+
+# --- ALLERGY MANAGEMENT ---
+
+@app.route('/api/allergies', methods=['POST'])
+def update_allergies():
+    data = request.json or {}
+    allergies = data.get('allergies', [])
+    # Validate
+    valid = [a for a in allergies if a in ALL_ALLERGENS]
+
+    session['allergies'] = valid
+    session.modified = True
+
+    # Persist if logged in
+    user_id = session.get('user_id')
+    if user_id:
+        user = db.session.get(User, user_id)
+        if user:
+            user.allergies = ','.join(valid) if valid else None
+            db.session.commit()
+
+    return jsonify({'status': 'success', 'allergies': valid})
+
+# --- REVIEWS ---
+
+@app.route('/reviews')
+def reviews_page():
+    # Get all ratings from DB with food info
+    all_ratings = Rating.query.order_by(Rating.created_at.desc()).limit(50).all()
+    foods_dict = {f.food_id: f for f in get_foods()}
+    users_dict = {}
+
+    current_user_id = session.get('user_id')
+    review_items = []
+    for r in all_ratings:
+        food = foods_dict.get(r.food_id)
+        if not food:
+            continue
+        if r.user_id not in users_dict:
+            users_dict[r.user_id] = db.session.get(User, r.user_id)
+        user = users_dict.get(r.user_id)
+
+        review_items.append({
+            'rating': r,
+            'food': food,
+            'user_name': user.name if user else 'Anonymous',
+            'can_manage': current_user_id and r.user_id == current_user_id,
+            'source': 'db',
+            'review_id': r.rating_id,
+        })
+
+    if not current_user_id:
+        session_ratings = session.get('ratings', [])
+        for idx, sr in enumerate(session_ratings):
+            food = foods_dict.get(sr['food_id'])
+            if not food or not sr.get('review'):
+                continue
+            review_items.append({
+                'rating': type('R', (), {
+                    'rating': sr['rating'],
+                    'review': sr.get('review', ''),
+                    'created_at': datetime.now(),
+                })(),
+                'food': food,
+                'user_name': 'You',
+                'can_manage': not current_user_id,
+                'source': 'session',
+                'session_index': idx,
+            })
+
+    review_items.sort(
+        key=lambda item: item['rating'].created_at if hasattr(item['rating'], 'created_at') else datetime.min,
+        reverse=True,
+    )
+
+    return render_template('reviews.html', review_items=review_items, active_page='reviews')
+
+
+@app.route('/api/reviews/<rating_id>', methods=['PUT', 'DELETE'])
+def manage_db_review(rating_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'status': 'error', 'message': 'Sign in to manage reviews.'}), 401
+
+    rating = db.session.get(Rating, rating_id)
+    if not rating or rating.user_id != user_id:
+        return jsonify({'status': 'error', 'message': 'Review not found.'}), 404
+
+    if request.method == 'DELETE':
+        db.session.delete(rating)
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Review deleted.'})
+
+    data = request.json or {}
+    try:
+        rating_int = int(data.get('rating', rating.rating))
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': 'Rating must be between 1 and 5.'}), 400
+
+    if not 1 <= rating_int <= 5:
+        return jsonify({'status': 'error', 'message': 'Rating must be between 1 and 5.'}), 400
+
+    rating.rating = rating_int
+    rating.review = (data.get('review') or '').strip() or None
+    db.session.commit()
+    return jsonify({'status': 'success', 'message': 'Review updated.'})
+
+
+@app.route('/api/reviews/session/<int:session_index>', methods=['PUT', 'DELETE'])
+def manage_session_review(session_index):
+    if session.get('user_id'):
+        return jsonify({'status': 'error', 'message': 'Use account review management while signed in.'}), 400
+
+    ratings = session.get('ratings', [])
+    if session_index < 0 or session_index >= len(ratings):
+        return jsonify({'status': 'error', 'message': 'Review not found.'}), 404
+
+    if request.method == 'DELETE':
+        ratings.pop(session_index)
+        session['ratings'] = ratings
+        session.modified = True
+        return jsonify({'status': 'success', 'message': 'Review deleted.'})
+
+    data = request.json or {}
+    try:
+        rating_int = int(data.get('rating', ratings[session_index]['rating']))
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': 'Rating must be between 1 and 5.'}), 400
+
+    if not 1 <= rating_int <= 5:
+        return jsonify({'status': 'error', 'message': 'Rating must be between 1 and 5.'}), 400
+
+    ratings[session_index]['rating'] = rating_int
+    ratings[session_index]['review'] = (data.get('review') or '').strip()
+    session['ratings'] = ratings
+    session.modified = True
+    return jsonify({'status': 'success', 'message': 'Review updated.'})
+
+# --- GROCERY LIST ---
+
+@app.route('/grocery-list')
+def grocery_list_page():
+    return render_template('grocery_list.html', active_page='grocery')
+
+@app.route('/api/foods')
+def api_foods():
+    foods = get_foods()
+    return jsonify({
+        'status': 'success',
+        'foods': [
+            {
+                'food_id': f.food_id,
+                'food_name': f.food_name,
+                'cuisine': f.cuisine,
+                'veg_nonveg': f.veg_nonveg,
+                'category': f.category,
+            }
+            for f in foods
+        ],
+    })
+
+@app.route('/api/grocery-list', methods=['POST'])
+def generate_grocery_list():
+    data = request.json or {}
+    food_ids = data.get('food_ids', [])
+
+    if not food_ids:
+        # Use latest meal plan if no food ids provided
+        plan_id = data.get('plan_id')
+        if plan_id:
+            items = MealPlanItem.query.filter_by(plan_id=plan_id).all()
+            food_ids = list({item.food_id for item in items})
+        else:
+            return jsonify({'status': 'error', 'message': 'No foods selected'}), 400
+
+    foods = [get_food(fid) for fid in food_ids]
+    foods = [f for f in foods if f]
+
+    # Aggregate ingredients
+    ingredient_counts = {}
+    for food in foods:
+        for ingredient in food.get_ingredients_list():
+            ingredient_lower = ingredient.strip().lower()
+            if ingredient_lower:
+                if ingredient_lower not in ingredient_counts:
+                    ingredient_counts[ingredient_lower] = {'name': ingredient.strip(), 'count': 0, 'foods': []}
+                ingredient_counts[ingredient_lower]['count'] += 1
+                if food.food_name not in ingredient_counts[ingredient_lower]['foods']:
+                    ingredient_counts[ingredient_lower]['foods'].append(food.food_name)
+
+    # Sort by frequency
+    sorted_ingredients = sorted(ingredient_counts.values(), key=lambda x: (-x['count'], x['name']))
+
+    # Categorize
+    spices = {'cumin', 'coriander', 'turmeric', 'chili', 'chili powder', 'paprika', 'oregano', 'basil', 'parsley',
+              'dill', 'bay leaf', 'cardamom', 'cinnamon', 'saffron', 'mint', 'fenugreek', 'mustard seeds', 'curry leaves',
+              'chili flakes', 'vanilla', 'pepper', 'wasabi', 'chili pepper'}
+    staples = {'salt', 'oil', 'olive oil', 'sesame oil', 'sugar', 'flour', 'cornstarch', 'baking powder',
+               'yeast', 'ghee', 'butter', 'soy sauce', 'vinegar'}
+    proteins = {'chicken', 'beef', 'beef patty', 'beef mince', 'salmon', 'tuna', 'egg', 'egg yolk', 'tofu',
+                'paneer', 'chickpea', 'kidney beans', 'black beans', 'toor dal', 'urad dal', 'lentil',
+                'anchovy', 'fish'}
+
+    categorized = {'Proteins': [], 'Vegetables & Fruits': [], 'Dairy': [], 'Grains & Staples': [], 'Spices & Herbs': [], 'Other': []}
+
+    dairy_items = {'milk', 'cream', 'cheese', 'cheddar cheese', 'mozzarella', 'parmesan', 'feta cheese',
+                   'yogurt', 'buttermilk', 'butter', 'ghee', 'almond milk'}
+
+    grains = {'rice', 'basmati rice', 'sushi rice', 'noodles', 'ramen noodles', 'fettuccine', 'pasta',
+              'bread', 'sourdough bread', 'baguette', 'burger bun', 'tortilla', 'flour tortilla', 'corn tortilla',
+              'oats', 'quinoa', 'granola'}
+
+    for item in sorted_ingredients:
+        name_lower = item['name'].lower()
+        if name_lower in spices:
+            categorized['Spices & Herbs'].append(item)
+        elif name_lower in proteins:
+            categorized['Proteins'].append(item)
+        elif name_lower in dairy_items:
+            categorized['Dairy'].append(item)
+        elif name_lower in grains or name_lower in staples:
+            categorized['Grains & Staples'].append(item)
+        else:
+            categorized['Vegetables & Fruits'].append(item)
+
+    return jsonify({
+        'status': 'success',
+        'grocery_list': categorized,
+        'total_items': len(sorted_ingredients),
+        'foods_count': len(foods),
+    })
+
 
 # --- ADMIN PANEL ---
 
@@ -456,6 +961,7 @@ def save_food():
         return redirect(url_for('index'))
 
     add_to_history(food.food_id)
+    learn_preference(food)
     if request.is_json:
         return jsonify({'status': 'success', 'message': 'Saved to your hitlist.'})
     flash('Saved to your hitlist.', 'success')
@@ -575,6 +1081,8 @@ def admin_save_food():
     food.fats = fats
     food.image_url = required_text('image_url')
     food.description = description
+    food.ingredients = required_text('ingredients')
+    food.allergens = required_text('allergens')
 
     if not food_id:
         db.session.add(food)

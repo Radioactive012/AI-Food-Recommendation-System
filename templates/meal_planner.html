@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Urban Diner - Meal Planner{% endblock %}
+
+{% block content %}
+<section class="content-section">
+    <div class="section-heading">
+        <span class="section-kicker">AI-powered planning</span>
+        <h1>Weekly Meal Planner</h1>
+        <p>Generate a personalized meal plan matched to your diet, goals, and allergies.</p>
+    </div>
+
+    <div class="planner-controls">
+        <div class="planner-options">
+            <div class="preference-group">
+                <label>Diet Type</label>
+                <div class="segmented-row">
+                    <button type="button" class="planner-diet segment selected" data-value="Veg">Vegetarian</button>
+                    <button type="button" class="planner-diet segment" data-value="Non-Veg">Non-Veg</button>
+                    <button type="button" class="planner-diet segment" data-value="Vegan">Vegan</button>
+                </div>
+            </div>
+            <div class="preference-group">
+                <label>Health Goal</label>
+                <div class="segmented-row planner-goal-row">
+                    <button type="button" class="planner-goal segment selected" data-value="Healthy Eating">Eat Clean</button>
+                    <button type="button" class="planner-goal segment" data-value="Weight Loss">Weight Loss</button>
+                    <button type="button" class="planner-goal segment" data-value="Muscle Gain">Muscle Gain</button>
+                </div>
+                <div class="segmented-row planner-goal-row" style="margin-top:8px;">
+                    <button type="button" class="planner-goal segment" data-value="Diabetes-Friendly">Diabetes</button>
+                    <button type="button" class="planner-goal segment" data-value="Heart-Healthy">Heart</button>
+                    <button type="button" class="planner-goal segment" data-value="Maintenance">Maintain</button>
+                </div>
+            </div>
+        </div>
+        <button type="button" class="primary-cta" id="generatePlanBtn">
+            <span class="material-symbols-outlined">auto_awesome</span>
+            Generate Meal Plan
+        </button>
+    </div>
+</section>
+
+<section class="content-section" id="planResults" style="display:none;">
+    <div class="section-heading split">
+        <div>
+            <h2>Your Meal Plan</h2>
+            <p id="planSubtitle"></p>
+        </div>
+        <button type="button" class="secondary-cta" id="groceryFromPlanBtn" style="width:auto;">
+            <span class="material-symbols-outlined">shopping_cart</span>
+            Generate Grocery List
+        </button>
+    </div>
+    <div id="planGrid" class="meal-plan-grid"></div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentPlanId = null;
+    let selectedDiet = 'Veg';
+    let selectedGoal = 'Healthy Eating';
+
+    // Diet toggle
+    document.querySelectorAll('.planner-diet').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.planner-diet').forEach(b => b.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedDiet = this.dataset.value;
+        });
+    });
+
+    // Goal toggle
+    document.querySelectorAll('.planner-goal').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.planner-goal').forEach(b => b.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedGoal = this.dataset.value;
+        });
+    });
+
+    // Generate plan
+    document.getElementById('generatePlanBtn').addEventListener('click', function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> Generating...';
+
+        fetch('/api/generate-meal-plan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                days: 7,
+                diet_type: selectedDiet,
+                health_goal: selectedGoal,
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span> Regenerate Plan';
+
+            if (data.status === 'success') {
+                currentPlanId = data.plan_id;
+                renderPlan(data.plan);
+                document.getElementById('planResults').style.display = '';
+                document.getElementById('planResults').scrollIntoView({behavior: 'smooth'});
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span> Generate Meal Plan';
+        });
+    });
+
+    function renderPlan(plan) {
+        const grid = document.getElementById('planGrid');
+        grid.innerHTML = '';
+        document.getElementById('planSubtitle').textContent = `${selectedDiet} · ${selectedGoal} · ${plan.length} days`;
+
+        plan.forEach(day => {
+            const card = document.createElement('div');
+            card.className = 'meal-day-card';
+
+            let slotsHtml = '';
+            const slots = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+            slots.forEach(slot => {
+                const food = day.slots[slot];
+                if (!food) return;
+                slotsHtml += `
+                    <div class="meal-slot">
+                        <span class="meal-slot-label">${slot}</span>
+                        <div class="meal-slot-food">
+                            <a href="/recommendation-direct?food_id=${food.food_id}">
+                                ${food.image_url
+                                    ? `<img src="${food.image_url}" alt="${food.food_name}" loading="lazy">`
+                                    : `<span class="meal-slot-thumb-placeholder" aria-hidden="true"><span class="material-symbols-outlined">restaurant</span></span>`}
+                            </a>
+                            <div>
+                                <strong>${food.food_name}</strong>
+                                <span>${food.calories} kcal · ${food.protein}g protein · ₹${Math.round(food.price)}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            card.innerHTML = `
+                <div class="meal-day-header">
+                    <h3>${day.day}</h3>
+                    <span>${day.total_calories} kcal · ${day.total_protein}g protein</span>
+                </div>
+                ${slotsHtml}`;
+            grid.appendChild(card);
+        });
+    }
+
+    // Grocery list from plan
+    document.getElementById('groceryFromPlanBtn').addEventListener('click', function() {
+        if (!currentPlanId) return;
+        window.location.href = '/grocery-list?plan_id=' + currentPlanId;
+    });
+});
+</script>
+{% endblock %}

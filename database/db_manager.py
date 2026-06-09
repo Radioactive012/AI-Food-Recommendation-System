@@ -1,8 +1,20 @@
 import os
 import csv
 from werkzeug.security import generate_password_hash
+from sqlalchemy import inspect, text
 from models.models import db, Food, Admin
 import uuid
+
+
+def _migrate_schema():
+    """Add new columns to existing SQLite tables when needed."""
+    inspector = inspect(db.engine)
+    if 'users' in inspector.get_table_names():
+        user_columns = {column['name'] for column in inspector.get_columns('users')}
+        if 'learned_prefs' not in user_columns:
+            db.session.execute(text('ALTER TABLE users ADD COLUMN learned_prefs TEXT'))
+            db.session.commit()
+
 
 def init_db(app):
     """
@@ -14,6 +26,7 @@ def init_db(app):
     with app.app_context():
         # Create all tables if they don't exist
         db.create_all()
+        _migrate_schema()
         print("Database tables checked/created successfully.")
         
         # Check if admin table is empty and seed an admin only when credentials
@@ -58,7 +71,9 @@ def init_db(app):
                             price=float(row['price']),
                             meal_type=row.get('meal_type', 'Heavy'),
                             image_url=row.get('image_url', ''),
-                            description=row.get('description', '')
+                            description=row.get('description', ''),
+                            ingredients=row.get('ingredients', ''),
+                            allergens=row.get('allergens', ''),
                         )
                         db.session.add(food)
                 db.session.commit()

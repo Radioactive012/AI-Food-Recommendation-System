@@ -13,7 +13,7 @@
     <div class="auth-card wide">
         <div class="section-heading">
             <h1>Join Urban Diner</h1>
-            <p>Your account stores dietary preferences locally in the app database.</p>
+            <p>Your account stores dietary preferences on this site.</p>
         </div>
 
         <form action="{{ url_for('register') }}" method="POST" class="auth-form two-col">
@@ -72,6 +72,8 @@
                     <option value="Muscle Gain">Muscle Gain</option>
                     <option value="Maintenance">Maintenance</option>
                     <option value="Healthy Eating" selected>Healthy Eating</option>
+                    <option value="Diabetes-Friendly">Diabetes-Friendly</option>
+                    <option value="Heart-Healthy">Heart-Healthy</option>
                 </select>
             </div>
 
@@ -83,6 +85,19 @@
                     <option value="Stressed">Comfort</option>
                     <option value="Tired">Quick Energy</option>
                 </select>
+            </div>
+
+            <div class="preference-group full-width">
+                <label>Food Allergies & Restrictions</label>
+                <div class="chip-row">
+                    {% for allergen in all_allergens %}
+                        <label class="allergy-check-label pill-chip">
+                            <input type="checkbox" name="allergies" value="{{ allergen }}">
+                            {{ allergen }}
+                        </label>
+                    {% endfor %}
+                </div>
+                <small style="color: var(--text-muted);">Select any that apply. We'll exclude matching dishes from your recommendations.</small>
             </div>
 
             <button type="submit" class="primary-cta full-width">

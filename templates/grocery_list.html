@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Urban Diner - Grocery List{% endblock %}
+
+{% block content %}
+<section class="content-section">
+    <div class="section-heading">
+        <span class="section-kicker">Smart shopping</span>
+        <h1>Grocery List Generator</h1>
+        <p>Automatically generate a shopping list from your meal plan or selected dishes.</p>
+    </div>
+
+    <div class="grocery-controls">
+        <div class="preference-group">
+            <label>Select dishes to generate a grocery list</label>
+            <div class="grocery-food-selector" id="foodSelector">
+                <p class="grocery-hint">Loading dishes…</p>
+            </div>
+        </div>
+        <button type="button" class="primary-cta" id="generateGroceryBtn">
+            <span class="material-symbols-outlined">shopping_cart</span>
+            Generate Shopping List
+        </button>
+    </div>
+</section>
+
+<section class="content-section" id="groceryResults" style="display:none;">
+    <div class="section-heading split">
+        <div>
+            <h2 id="groceryTitle">Shopping List</h2>
+            <p id="grocerySubtitle"></p>
+        </div>
+        <button type="button" class="secondary-cta" id="printGroceryBtn" style="width:auto;" onclick="window.print()">
+            <span class="material-symbols-outlined">print</span>
+            Print
+        </button>
+    </div>
+    <div id="groceryGrid" class="grocery-grid"></div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const planId = new URLSearchParams(window.location.search).get('plan_id');
+    const selector = document.getElementById('foodSelector');
+
+    fetchFoods();
+
+    async function fetchFoods() {
+        try {
+            const resp = await fetch('/api/foods');
+            const data = await resp.json();
+            if (data.status !== 'success' || !data.foods.length) {
+                selector.innerHTML = '<p class="grocery-hint">No dishes available. Try generating a meal plan first.</p>';
+                return;
+            }
+
+            let checkboxHtml = '<div class="grocery-checkboxes">';
+            data.foods.forEach(food => {
+                checkboxHtml += `
+                    <label class="grocery-check-item">
+                        <input type="checkbox" value="${food.food_id}" class="grocery-food-check">
+                        <span>${food.food_name}</span>
+                    </label>`;
+            });
+            checkboxHtml += '</div>';
+            selector.innerHTML = checkboxHtml;
+        } catch (e) {
+            selector.innerHTML = '<p class="grocery-hint">Could not load dishes. Please refresh the page.</p>';
+        }
+    }
+
+    if (planId) {
+        generateGroceryList([], planId);
+    }
+
+    document.getElementById('generateGroceryBtn').addEventListener('click', function() {
+        const checked = Array.from(document.querySelectorAll('.grocery-food-check:checked')).map(c => c.value);
+        if (checked.length === 0 && !planId) {
+            alert('Please select at least one dish.');
+            return;
+        }
+        generateGroceryList(checked, planId);
+    });
+
+    function generateGroceryList(foodIds, planId) {
+        const btn = document.getElementById('generateGroceryBtn');
+        btn.disabled = true;
+
+        const body = {};
+        if (foodIds.length > 0) body.food_ids = foodIds;
+        if (planId) body.plan_id = planId;
+
+        fetch('/api/grocery-list', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            if (data.status === 'success') {
+                renderGroceryList(data);
+                document.getElementById('groceryResults').style.display = '';
+                document.getElementById('groceryResults').scrollIntoView({behavior: 'smooth'});
+            }
+        })
+        .catch(() => { btn.disabled = false; });
+    }
+
+    function renderGroceryList(data) {
+        document.getElementById('grocerySubtitle').textContent =
+            `${data.total_items} ingredients from ${data.foods_count} dishes`;
+
+        const grid = document.getElementById('groceryGrid');
+        grid.innerHTML = '';
+
+        const categories = data.grocery_list;
+        const icons = {
+            'Proteins': 'egg_alt',
+            'Vegetables & Fruits': 'nutrition',
+            'Dairy': 'water_drop',
+            'Grains & Staples': 'grain',
+            'Spices & Herbs': 'spa',
+            'Other': 'category'
+        };
+
+        for (const [category, items] of Object.entries(categories)) {
+            if (items.length === 0) continue;
+
+            const section = document.createElement('div');
+            section.className = 'grocery-category';
+            section.innerHTML = `
+                <div class="grocery-category-header">
+                    <span class="material-symbols-outlined">${icons[category] || 'category'}</span>
+                    <h3>${category}</h3>
+                    <span class="grocery-count">${items.length}</span>
+                </div>
+                <div class="grocery-items">
+                    ${items.map(item => `
+                        <label class="grocery-item">
+                            <input type="checkbox">
+                            <span class="grocery-item-name">${item.name}</span>
+                            <span class="grocery-item-detail">Used in ${item.foods.join(', ')}</span>
+                        </label>
+                    `).join('')}
+                </div>`;
+            grid.appendChild(section);
+        }
+    }
+});
+</script>
+{% endblock %}

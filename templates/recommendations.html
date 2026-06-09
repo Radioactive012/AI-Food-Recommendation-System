@@ -95,6 +95,14 @@
                                 <div><strong>{{ food.carbs | round | int }}g</strong><span>Carbs</span></div>
                                 <div><strong>{{ food.fats | round | int }}g</strong><span>Fats</span></div>
                             </div>
+                            {% set vitamins = get_food_vitamins(food) %}
+                            {% if vitamins %}
+                            <div class="tag-row vitamin-tag-row">
+                                {% for vitamin in vitamins %}
+                                <span class="vitamin-tag">{{ vitamin }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                             <div class="reason-box">
                                 <span class="material-symbols-outlined">auto_awesome</span>
                                 {{ explanation }}

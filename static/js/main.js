@@ -1,6 +1,28 @@
 // BiteWise AI Food Recommendation System - Interactive JavaScript
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Mobile site menu toggle
+    const navToggle = document.getElementById('navToggle');
+    const siteNav = document.getElementById('siteNav');
+
+    if (navToggle && siteNav) {
+        navToggle.addEventListener('click', function() {
+            const isOpen = siteNav.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            navToggle.setAttribute('aria-label', isOpen ? 'Close site menu' : 'Open site menu');
+            navToggle.querySelector('.material-symbols-outlined').textContent = isOpen ? 'close' : 'menu';
+        });
+
+        siteNav.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                siteNav.classList.remove('open');
+                navToggle.setAttribute('aria-expanded', 'false');
+                navToggle.setAttribute('aria-label', 'Open site menu');
+                navToggle.querySelector('.material-symbols-outlined').textContent = 'menu';
+            });
+        });
+    }
+
     // 1. Budget Range Slider Display Update
     const budgetSlider = document.getElementById('budgetSlider');
     const budgetValDisplay = document.getElementById('budgetVal');
