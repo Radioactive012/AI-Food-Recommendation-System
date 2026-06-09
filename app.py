@@ -2,7 +2,11 @@ import os
 import re
 import concurrent.futures
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlsplit
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -258,6 +262,70 @@ def inject_user():
         get_food_vitamins=get_food_vitamins,
     )
 
+def generate_otp():
+    return "".join(secrets.choice("0123456789") for _ in range(6))
+
+
+def send_otp_email(email, otp_code, user_name, subject_prefix="Urban Diner"):
+    subject = f"{subject_prefix} - Email Verification Code"
+    body = f"""Hi {user_name},
+
+Thank you for choosing Urban Diner! To verify your email address, please use the 6-digit One Time Password (OTP) below:
+
+👉 {otp_code}
+
+This code is valid for 10 minutes. If you did not request this, you can safely ignore this email.
+
+Happy Dining!
+The Urban Diner Team
+"""
+    
+    # Try sending real email if SMTP is configured
+    smtp_server = os.environ.get('SMTP_SERVER')
+    smtp_port = os.environ.get('SMTP_PORT', 587)
+    smtp_user = os.environ.get('SMTP_USERNAME')
+    smtp_pass = os.environ.get('SMTP_PASSWORD')
+    smtp_from = os.environ.get('SMTP_FROM_EMAIL', 'no-reply@urbandiner.com')
+    
+    sent_via_smtp = False
+    smtp_error = None
+    
+    if smtp_server and smtp_user and smtp_pass:
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = smtp_from
+            msg['To'] = email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'plain'))
+            
+            server = smtplib.SMTP(smtp_server, int(smtp_port), timeout=10)
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, email, msg.as_string())
+            server.quit()
+            sent_via_smtp = True
+        except Exception as e:
+            smtp_error = str(e)
+            print(f"SMTP sending failed: {e}")
+            
+    # Write to local file log (sent_emails.log)
+    log_file = os.path.join(app.root_path, 'sent_emails.log')
+    try:
+        with open(log_file, 'a', encoding='utf-8') as lf:
+            lf.write(f"\n{'='*50}\n")
+            lf.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            lf.write(f"To: {email}\n")
+            lf.write(f"Subject: {subject}\n")
+            lf.write(f"SMTP Status: {'Sent' if sent_via_smtp else ('Failed: ' + smtp_error if smtp_error else 'Not Configured (Simulated)')}\n")
+            lf.write(f"Body:\n{body}\n")
+            lf.write(f"{'='*50}\n")
+    except Exception as le:
+        print(f"Failed to write email to log: {le}")
+        
+    print(f"\n[EMAIL SIMULATION] To: {email} | Subject: {subject} | OTP: {otp_code}\n")
+    return sent_via_smtp
+
+
 # --- ROUTES ---
 
 @app.route('/favicon.ico')
@@ -292,6 +360,15 @@ def login():
         if not user or not check_password_hash(user.password, password):
             flash('Invalid email or password.', 'error')
             return render_template('login.html', active_page='login'), 401
+
+        if not user.is_verified:
+            # Generate and send new OTP
+            user.otp_code = generate_otp()
+            user.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+            db.session.commit()
+            send_otp_email(user.email, user.otp_code, user.name)
+            flash('Please verify your email address to log in. An OTP has been sent.', 'warning')
+            return redirect(url_for('verify_otp', email=user.email))
 
         session['user_id'] = user.user_id
         session['preferences'] = {
@@ -350,32 +427,247 @@ def register():
             health_goal=request.form.get('health_goal') or 'Healthy Eating',
             mood_preference=request.form.get('mood_preference') or 'Neutral',
             allergies=allergies_str,
+            is_verified=False,
+            otp_code=generate_otp(),
+            otp_expiry=datetime.utcnow() + timedelta(minutes=10)
         )
         db.session.add(user)
         db.session.commit()
 
-        session['user_id'] = user.user_id
-        session['preferences'] = {
-            'diet_type': user.diet_type,
-            'spice_preference': user.spice_preference,
-            'health_goal': user.health_goal,
-            'mood_preference': user.mood_preference,
-            'cuisine_preference': '',
-            'budget': 500,
-            'search_query': ''
-        }
-        session['allergies'] = user.get_allergies_list()
-        flash('Account created. Your taste profile is ready.', 'success')
-        return redirect(url_for('index'))
+        # Send simulated/actual OTP email
+        send_otp_email(user.email, user.otp_code, user.name)
+
+        flash('Account created. Please enter the verification OTP sent to your email.', 'success')
+        return redirect(url_for('verify_otp', email=user.email))
 
     return render_template('register.html', active_page='login')
 
 @app.route('/logout')
 def logout():
-    # Used as a "Reset Preferences & History" action
+    was_logged_in = 'user_id' in session
     session.clear()
-    flash('Preferences and history reset successfully.', 'success')
+    if was_logged_in:
+        flash('You have been signed out successfully.', 'success')
+    else:
+        flash('Preferences and history reset successfully.', 'success')
     return redirect(url_for('index'))
+
+
+@app.route('/verify-otp', methods=['GET', 'POST'])
+def verify_otp():
+    email = request.args.get('email', '').strip().lower() or request.form.get('email', '').strip().lower()
+    if not email:
+        flash('Email address is required for verification.', 'error')
+        return redirect(url_for('login'))
+        
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        flash('Account not found.', 'error')
+        return redirect(url_for('login'))
+        
+    if user.is_verified:
+        flash('This account is already verified. Please sign in.', 'info')
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        otp = request.form.get('otp', '').strip()
+        if not otp or len(otp) != 6:
+            flash('Please enter a valid 6-digit OTP code.', 'error')
+            return render_template('verify_otp.html', email=email, dev_otp=user.otp_code)
+            
+        if user.otp_code != otp:
+            flash('Incorrect OTP code. Please try again.', 'error')
+            return render_template('verify_otp.html', email=email, dev_otp=user.otp_code)
+            
+        if user.otp_expiry and user.otp_expiry < datetime.utcnow():
+            flash('This OTP has expired. Please request a new code.', 'error')
+            return render_template('verify_otp.html', email=email, dev_otp=user.otp_code)
+            
+        # Success!
+        user.is_verified = True
+        user.otp_code = None
+        user.otp_expiry = None
+        db.session.commit()
+        
+        # Log user in
+        session['user_id'] = user.user_id
+        session['preferences'] = {
+            'diet_type': user.diet_type or 'Veg',
+            'spice_preference': user.spice_preference or 'Medium',
+            'health_goal': user.health_goal or 'Healthy Eating',
+            'mood_preference': user.mood_preference or 'Neutral',
+            'cuisine_preference': '',
+            'budget': 500,
+            'search_query': ''
+        }
+        session['allergies'] = user.get_allergies_list()
+        
+        flash('Email address verified successfully! Welcome to Urban Diner.', 'success')
+        return redirect(url_for('index'))
+        
+    return render_template('verify_otp.html', email=email, dev_otp=user.otp_code)
+
+
+@app.route('/resend-otp', methods=['POST'])
+def resend_otp():
+    email = request.form.get('email', '').strip().lower()
+    if not email:
+        flash('Email address is required to resend OTP.', 'error')
+        return redirect(url_for('login'))
+        
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        flash('Account not found.', 'error')
+        return redirect(url_for('login'))
+        
+    if user.is_verified:
+        flash('This account is already verified. Please sign in.', 'info')
+        return redirect(url_for('login'))
+        
+    user.otp_code = generate_otp()
+    user.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+    db.session.commit()
+    
+    send_otp_email(user.email, user.otp_code, user.name)
+    flash('A new OTP verification code has been sent to your email.', 'success')
+    return redirect(url_for('verify_otp', email=user.email))
+
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        if not email:
+            flash('Please enter your email address.', 'error')
+            return render_template('forgot_password.html')
+            
+        user = User.query.filter_by(email=email).first()
+        if user:
+            user.otp_code = generate_otp()
+            user.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+            db.session.commit()
+            send_otp_email(user.email, user.otp_code, user.name, subject_prefix="Urban Diner Password Reset")
+            flash('A password reset code has been sent to your email.', 'success')
+            return redirect(url_for('reset_password', email=user.email))
+        else:
+            print(f"[FORGOT PASSWORD] Requested email not found: {email}")
+            flash('If that email exists in our system, we have sent a reset code to it.', 'info')
+            return render_template('forgot_password.html')
+            
+    return render_template('forgot_password.html')
+
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    email = request.args.get('email', '').strip().lower() or request.form.get('email', '').strip().lower()
+    if not email:
+        flash('Email address is required to reset password.', 'error')
+        return redirect(url_for('forgot_password'))
+        
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        flash('Account not found.', 'error')
+        return redirect(url_for('forgot_password'))
+        
+    if request.method == 'POST':
+        otp = request.form.get('otp', '').strip()
+        new_password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not otp or not new_password:
+            flash('Please fill in all fields.', 'error')
+            return render_template('reset_password.html', email=email, dev_otp=user.otp_code)
+            
+        if len(new_password) < 6:
+            flash('New password must be at least 6 characters.', 'error')
+            return render_template('reset_password.html', email=email, dev_otp=user.otp_code)
+            
+        if new_password != confirm_password:
+            flash('Passwords do not match.', 'error')
+            return render_template('reset_password.html', email=email, dev_otp=user.otp_code)
+            
+        if user.otp_code != otp:
+            flash('Incorrect OTP code. Please try again.', 'error')
+            return render_template('reset_password.html', email=email, dev_otp=user.otp_code)
+            
+        if user.otp_expiry and user.otp_expiry < datetime.utcnow():
+            flash('This OTP has expired. Please request a new reset code.', 'error')
+            return redirect(url_for('forgot_password'))
+            
+        user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
+        user.otp_code = None
+        user.otp_expiry = None
+        user.is_verified = True
+        db.session.commit()
+        
+        flash('Password has been reset successfully. Please sign in.', 'success')
+        return redirect(url_for('login'))
+        
+    return render_template('reset_password.html', email=email, dev_otp=user.otp_code)
+
+
+@app.route('/profile', methods=['GET', 'POST'])
+def profile():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please sign in to view your profile.', 'error')
+        return redirect(url_for('login'))
+        
+    user = db.session.get(User, user_id)
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        age_str = request.form.get('age', '').strip()
+        gender = request.form.get('gender') or None
+        diet_type = request.form.get('diet_type', 'Veg')
+        spice_preference = request.form.get('spice_preference', 'Medium')
+        health_goal = request.form.get('health_goal', 'Healthy Eating')
+        mood_preference = request.form.get('mood_preference', 'Neutral')
+        selected_allergies = request.form.getlist('allergies')
+        
+        if not name:
+            flash('Name cannot be empty.', 'error')
+            return render_template('profile.html', user=user, active_page='profile')
+            
+        try:
+            age = int(age_str) if age_str else None
+        except ValueError:
+            flash('Please enter a valid age.', 'error')
+            return render_template('profile.html', user=user, active_page='profile')
+            
+        allergies_str = ','.join(selected_allergies) if selected_allergies else None
+        
+        # Update
+        user.name = name
+        user.age = age
+        user.gender = gender
+        user.diet_type = diet_type
+        user.spice_preference = spice_preference
+        user.health_goal = health_goal
+        user.mood_preference = mood_preference
+        user.allergies = allergies_str
+        
+        db.session.commit()
+        
+        session['preferences'] = {
+            'diet_type': user.diet_type,
+            'spice_preference': user.spice_preference,
+            'health_goal': user.health_goal,
+            'mood_preference': user.mood_preference,
+            'cuisine_preference': session.get('preferences', {}).get('cuisine_preference', ''),
+            'budget': session.get('preferences', {}).get('budget', 500.0),
+            'search_query': session.get('preferences', {}).get('search_query', '')
+        }
+        session['allergies'] = user.get_allergies_list()
+        
+        flash('Profile updated successfully!', 'success')
+        return redirect(url_for('profile'))
+        
+    return render_template('profile.html', user=user, active_page='profile')
+
 
 @app.route('/recommendations', methods=['POST'])
 def get_recommendation_results():

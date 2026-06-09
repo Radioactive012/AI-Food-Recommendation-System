@@ -14,6 +14,15 @@ def _migrate_schema():
         if 'learned_prefs' not in user_columns:
             db.session.execute(text('ALTER TABLE users ADD COLUMN learned_prefs TEXT'))
             db.session.commit()
+        if 'is_verified' not in user_columns:
+            db.session.execute(text('ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT 0 NOT NULL'))
+            db.session.commit()
+        if 'otp_code' not in user_columns:
+            db.session.execute(text('ALTER TABLE users ADD COLUMN otp_code VARCHAR(6)'))
+            db.session.commit()
+        if 'otp_expiry' not in user_columns:
+            db.session.execute(text('ALTER TABLE users ADD COLUMN otp_expiry DATETIME'))
+            db.session.commit()
 
 
 def init_db(app):

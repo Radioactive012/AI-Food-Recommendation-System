@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Urban Diner - My Taste Profile{% endblock %}
+
+{% block content %}
+<section class="auth-shell register-shell">
+    <div class="auth-visual" style="background-image: linear-gradient(180deg, rgba(0, 21, 14, 0.08), rgba(0, 21, 14, 0.82)), url('https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1200&h=1400&fit=crop&auto=format');">
+        <span class="section-kicker">Manage Preferences</span>
+        <h1>Your Taste Profile.</h1>
+        <p>Keep your dietary preferences, restrictions, and health goals up to date to receive highly personalized food recommendations.</p>
+    </div>
+
+    <div class="auth-card wide">
+        <div class="section-heading" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>My Profile</h1>
+                <p>Manage your account settings and preferences.</p>
+            </div>
+            <div class="verified-badge" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(34, 197, 94, 0.15); color: #22c55e; border-radius: var(--radius); font-weight: 600; font-size: 0.9rem;">
+                <span class="material-symbols-outlined" style="font-size: 20px;">verified</span>
+                Verified
+            </div>
+        </div>
+
+        <form action="{{ url_for('profile') }}" method="POST" class="auth-form two-col">
+            <div class="preference-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" class="form-input" value="{{ user.name }}" required>
+            </div>
+
+            <div class="preference-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" class="form-input" value="{{ user.email }}" disabled style="cursor: not-allowed; opacity: 0.7;">
+                <small style="color: var(--text-muted); display: block; margin-top: 4px;">Email address cannot be changed.</small>
+            </div>
+
+            <div class="preference-group">
+                <label for="age">Age</label>
+                <input type="number" id="age" name="age" class="form-input" value="{{ user.age or '' }}" min="1" max="120">
+            </div>
+
+            <div class="preference-group">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender" class="form-input">
+                    <option value="" {% if not user.gender %}selected{% endif %}>Prefer not to say</option>
+                    <option value="Male" {% if user.gender == 'Male' %}selected{% endif %}>Male</option>
+                    <option value="Female" {% if user.gender == 'Female' %}selected{% endif %}>Female</option>
+                    <option value="Other" {% if user.gender == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+
+            <div class="preference-group">
+                <label for="diet_type">Diet Type</label>
+                <select id="diet_type" name="diet_type" class="form-input" required>
+                    <option value="Veg" {% if user.diet_type == 'Veg' %}selected{% endif %}>Vegetarian</option>
+                    <option value="Non-Veg" {% if user.diet_type == 'Non-Veg' %}selected{% endif %}>Non-Vegetarian</option>
+                    <option value="Vegan" {% if user.diet_type == 'Vegan' %}selected{% endif %}>Vegan</option>
+                </select>
+            </div>
+
+            <div class="preference-group">
+                <label for="spice_preference">Spice Preference</label>
+                <select id="spice_preference" name="spice_preference" class="form-input" required>
+                    <option value="Low" {% if user.spice_preference == 'Low' %}selected{% endif %}>Low</option>
+                    <option value="Medium" {% if user.spice_preference == 'Medium' %}selected{% endif %}>Medium</option>
+                    <option value="High" {% if user.spice_preference == 'High' %}selected{% endif %}>High</option>
+                </select>
+            </div>
+
+            <div class="preference-group">
+                <label for="health_goal">Health Goal</label>
+                <select id="health_goal" name="health_goal" class="form-input" required>
+                    <option value="Weight Loss" {% if user.health_goal == 'Weight Loss' %}selected{% endif %}>Weight Loss</option>
+                    <option value="Muscle Gain" {% if user.health_goal == 'Muscle Gain' %}selected{% endif %}>Muscle Gain</option>
+                    <option value="Maintenance" {% if user.health_goal == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+                    <option value="Healthy Eating" {% if user.health_goal == 'Healthy Eating' %}selected{% endif %}>Healthy Eating</option>
+                    <option value="Diabetes-Friendly" {% if user.health_goal == 'Diabetes-Friendly' %}selected{% endif %}>Diabetes-Friendly</option>
+                    <option value="Heart-Healthy" {% if user.health_goal == 'Heart-Healthy' %}selected{% endif %}>Heart-Healthy</option>
+                </select>
+            </div>
+
+            <div class="preference-group">
+                <label for="mood_preference">Default Vibe</label>
+                <select id="mood_preference" name="mood_preference" class="form-input">
+                    <option value="Neutral" {% if user.mood_preference == 'Neutral' %}selected{% endif %}>Balanced</option>
+                    <option value="Energetic" {% if user.mood_preference == 'Energetic' %}selected{% endif %}>Energizing</option>
+                    <option value="Stressed" {% if user.mood_preference == 'Stressed' %}selected{% endif %}>Comfort</option>
+                    <option value="Tired" {% if user.mood_preference == 'Tired' %}selected{% endif %}>Quick Energy</option>
+                </select>
+            </div>
+
+            <div class="preference-group full-width">
+                <label>Food Allergies & Restrictions</label>
+                <div class="chip-row">
+                    {% set user_allergies_list = user.get_allergies_list() %}
+                    {% for allergen in all_allergens %}
+                        <label class="allergy-check-label pill-chip {% if allergen in user_allergies_list %}selected{% endif %}">
+                            <input type="checkbox" name="allergies" value="{{ allergen }}" {% if allergen in user_allergies_list %}checked{% endif %}>
+                            {{ allergen }}
+                        </label>
+                    {% endfor %}
+                </div>
+                <small style="color: var(--text-muted);">We exclude matching items from recommendations.</small>
+            </div>
+
+            <button type="submit" class="primary-cta full-width">
+                <span class="material-symbols-outlined">save</span>
+                Save Profile Changes
+            </button>
+        </form>
+    </div>
+</section>
+{% endblock %}

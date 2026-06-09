@@ -26,6 +26,7 @@ instance/
 
 # Local archives and exported design drops
 *.zip
+*.log
 
 # OS files
 .DS_Store

@@ -23,7 +23,10 @@
             </div>
 
             <div class="preference-group">
-                <label for="password">Password</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label for="password" style="margin: 0;">Password</label>
+                    <a href="{{ url_for('forgot_password') }}" style="font-size: 0.85rem; color: var(--primary); font-weight: 600; text-decoration: none;">Forgot password?</a>
+                </div>
                 <input type="password" id="password" name="password" class="form-input" placeholder="At least 6 characters" required>
             </div>
 

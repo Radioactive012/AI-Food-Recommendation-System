@@ -22,6 +22,9 @@ class User(db.Model):
     mood_preference = db.Column(db.String(50), nullable=True) # 'Stressed', 'Energetic', 'Tired', 'Neutral'
     allergies = db.Column(db.Text, nullable=True)             # Comma-separated: 'Gluten,Dairy,Nuts'
     learned_prefs = db.Column(db.Text, nullable=True)         # JSON: cuisine/category frequency counts
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
+    otp_code = db.Column(db.String(6), nullable=True)
+    otp_expiry = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships

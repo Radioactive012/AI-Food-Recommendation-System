@@ -9,7 +9,7 @@ os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
 from app import app
 from ml.similarity_model import RecommendationEngine
-from models.models import db, Food
+from models.models import db, Food, User
 from database.db_manager import init_db
 
 
@@ -499,6 +499,187 @@ class FlaskRouteTestCase(unittest.TestCase):
         self.assertEqual(call_kwargs['json']['reasoning'], {'exclude': True})
         self.assertEqual(call_kwargs['headers']['Authorization'], 'Bearer test-openrouter-key')
         self.assertEqual(call_kwargs['timeout'], 65)
+
+
+class AuthAndProfileTestCase(unittest.TestCase):
+    def setUp(self):
+        app.config['TESTING'] = True
+        self.client = app.test_client()
+        with app.app_context():
+            db.drop_all()
+            db.create_all()
+
+    def test_registration_sends_otp_and_redirects(self):
+        # Register new user
+        response = self.client.post('/register', data={
+            'name': 'Rahul Sharma',
+            'email': 'rahul@example.com',
+            'password': 'password123',
+            'age': '25',
+            'gender': 'Male',
+            'diet_type': 'Veg',
+            'spice_preference': 'Medium',
+            'health_goal': 'Healthy Eating',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/verify-otp?email=rahul@example.com', response.location)
+        
+        # Check user exists in DB and is not verified
+        with app.app_context():
+            user = User.query.filter_by(email='rahul@example.com').first()
+            self.assertIsNotNone(user)
+            self.assertFalse(user.is_verified)
+            self.assertIsNotNone(user.otp_code)
+            self.assertEqual(len(user.otp_code), 6)
+
+    def test_verify_otp_success_logs_in(self):
+        # Create unverified user manually
+        with app.app_context():
+            from werkzeug.security import generate_password_hash
+            from datetime import datetime, timedelta
+            user = User(
+                name='Rahul',
+                email='rahul@example.com',
+                password=generate_password_hash('password123', method='pbkdf2:sha256'),
+                is_verified=False,
+                otp_code='123456',
+                otp_expiry=datetime.utcnow() + timedelta(minutes=10)
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Post correct OTP
+        response = self.client.post('/verify-otp', data={
+            'email': 'rahul@example.com',
+            'otp': '123456',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, '/')
+
+        # Verify DB is updated
+        with app.app_context():
+            user = User.query.filter_by(email='rahul@example.com').first()
+            self.assertTrue(user.is_verified)
+            self.assertIsNone(user.otp_code)
+
+    def test_login_blocks_unverified_and_redirects(self):
+        # Create unverified user manually
+        with app.app_context():
+            from werkzeug.security import generate_password_hash
+            user = User(
+                name='Rahul',
+                email='rahul@example.com',
+                password=generate_password_hash('password123', method='pbkdf2:sha256'),
+                is_verified=False,
+                otp_code='111111'
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Attempt login
+        response = self.client.post('/login', data={
+            'email': 'rahul@example.com',
+            'password': 'password123',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/verify-otp?email=rahul@example.com', response.location)
+
+    def test_forgot_and_reset_password(self):
+        # Create verified user
+        with app.app_context():
+            from werkzeug.security import generate_password_hash
+            user = User(
+                name='Rahul',
+                email='rahul@example.com',
+                password=generate_password_hash('password123', method='pbkdf2:sha256'),
+                is_verified=True
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Request forgot password OTP
+        response = self.client.post('/forgot-password', data={
+            'email': 'rahul@example.com',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/reset-password?email=rahul@example.com', response.location)
+
+        # Get generated OTP
+        with app.app_context():
+            user = User.query.filter_by(email='rahul@example.com').first()
+            otp = user.otp_code
+            self.assertIsNotNone(otp)
+
+        # Reset password
+        reset_resp = self.client.post('/reset-password', data={
+            'email': 'rahul@example.com',
+            'otp': otp,
+            'password': 'newpassword123',
+            'confirm_password': 'newpassword123',
+        })
+        self.assertEqual(reset_resp.status_code, 302)
+        self.assertIn('/login', reset_resp.location)
+
+        # Try logging in with new password
+        login_resp = self.client.post('/login', data={
+            'email': 'rahul@example.com',
+            'password': 'newpassword123',
+        })
+        # If verified, logs in and redirects to '/' (Discover)
+        self.assertEqual(login_resp.status_code, 302)
+        self.assertEqual(login_resp.location, '/')
+
+    def test_profile_page_requires_login_and_updates(self):
+        # Create user
+        with app.app_context():
+            from werkzeug.security import generate_password_hash
+            user = User(
+                name='Rahul',
+                email='rahul@example.com',
+                password=generate_password_hash('password123', method='pbkdf2:sha256'),
+                is_verified=True
+            )
+            db.session.add(user)
+            db.session.commit()
+
+        # Access profile without login -> redirect to login
+        resp = self.client.get('/profile')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/login', resp.location)
+
+        # Log in first
+        self.client.post('/login', data={
+            'email': 'rahul@example.com',
+            'password': 'password123',
+        })
+
+        # Access profile -> success
+        resp = self.client.get('/profile')
+        self.assertEqual(resp.status_code, 200)
+
+        # Update profile
+        update_resp = self.client.post('/profile', data={
+            'name': 'Rahul Updated',
+            'age': '30',
+            'gender': 'Male',
+            'diet_type': 'Vegan',
+            'spice_preference': 'High',
+            'health_goal': 'Muscle Gain',
+            'mood_preference': 'Energetic',
+            'allergies': ['Dairy', 'Nuts']
+        })
+        self.assertEqual(update_resp.status_code, 302)
+
+        # Verify DB changes
+        with app.app_context():
+            user = User.query.filter_by(email='rahul@example.com').first()
+            self.assertEqual(user.name, 'Rahul Updated')
+            self.assertEqual(user.age, 30)
+            self.assertEqual(user.diet_type, 'Vegan')
+            self.assertEqual(user.spice_preference, 'High')
+            self.assertEqual(user.health_goal, 'Muscle Gain')
+            self.assertEqual(user.mood_preference, 'Energetic')
+            self.assertEqual(user.get_allergies_list(), ['Dairy', 'Nuts'])
 
 
 if __name__ == '__main__':

@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS users (
     mood_preference VARCHAR(50), -- 'Stressed', 'Energetic', 'Tired', 'Neutral'
     allergies TEXT,              -- Comma-separated: 'Gluten,Dairy,Nuts'
     learned_prefs TEXT,          -- JSON preference frequency data
+    is_verified BOOLEAN DEFAULT 0 NOT NULL,
+    otp_code VARCHAR(6),
+    otp_expiry TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
