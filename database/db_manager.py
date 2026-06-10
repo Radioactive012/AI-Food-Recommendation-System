@@ -2,6 +2,7 @@ import os
 import csv
 from werkzeug.security import generate_password_hash
 from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, inspect, text
+from sqlalchemy.exc import IntegrityError
 from models.models import db, Food, Admin
 import uuid
 
@@ -103,8 +104,12 @@ def _seed_missing_foods_from_csv(app):
             inserted += 1
 
     if inserted:
-        db.session.commit()
-        print(f"Seeded {inserted} missing foods from {csv_path}.")
+        try:
+            db.session.commit()
+            print(f"Seeded {inserted} missing foods from {csv_path}.")
+        except IntegrityError:
+            db.session.rollback()
+            print("Food seed skipped because another instance inserted the missing CSV rows.")
     else:
         print(f"Foods table already has all CSV seed items ({len(existing_ids)} items).")
 
