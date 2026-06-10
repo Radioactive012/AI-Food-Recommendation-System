@@ -33,3 +33,4 @@ tools/ux_audit.cjs
 # OS files
 .DS_Store
 Thumbs.db
+.env*

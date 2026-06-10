@@ -57,7 +57,7 @@ Do not commit a real `.env` file. The repository ignores `.env`, local SQLite da
 
 - Account creation and login use the local SQLite database created in the Flask `instance/` folder. New users are signed in immediately after registration.
 - Password reset is disabled by default for production safety. Set `ENABLE_DEV_OTP_RESET=1` locally to enable the development reset-code helper; it is ignored on Vercel/production.
-- Food inventory is stored in SQLite and seeded from `datasets/foods.csv` when the foods table is empty.
+- Food inventory is stored in the configured database. Missing dishes from `datasets/foods.csv` are added on startup without overwriting existing admin edits.
 - The chatbot uses OpenRouter when `OPENROUTER_API_KEY` is set, otherwise it uses the built-in fallback recommender. Free models can be slow or rate-limited, so `OPENROUTER_TIMEOUT_SECONDS` controls how long the app waits before falling back.
 - Admin inventory add, update, and delete actions require `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
 

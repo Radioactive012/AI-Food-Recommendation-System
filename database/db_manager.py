@@ -64,6 +64,51 @@ def _migrate_schema():
     ])
 
 
+def _food_from_csv_row(row):
+    return Food(
+        food_id=row['food_id'],
+        food_name=row['food_name'],
+        cuisine=row['cuisine'],
+        category=row['category'],
+        calories=int(row['calories']),
+        protein=float(row['protein']),
+        carbs=float(row['carbs']),
+        fats=float(row['fats']),
+        spice_level=row['spice_level'],
+        veg_nonveg=row['veg_nonveg'],
+        price=float(row['price']),
+        meal_type=row.get('meal_type', 'Heavy'),
+        image_url=row.get('image_url', ''),
+        description=row.get('description', ''),
+        ingredients=row.get('ingredients', ''),
+        allergens=row.get('allergens', ''),
+    )
+
+
+def _seed_missing_foods_from_csv(app):
+    csv_path = os.path.join(app.root_path, 'datasets', 'foods.csv')
+    if not os.path.exists(csv_path):
+        print(f"Warning: datasets/foods.csv not found at {csv_path}. Skipping food seeding.")
+        return
+
+    existing_ids = {food_id for (food_id,) in db.session.query(Food.food_id).all()}
+    inserted = 0
+
+    with open(csv_path, mode='r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row['food_id'] in existing_ids:
+                continue
+            db.session.add(_food_from_csv_row(row))
+            inserted += 1
+
+    if inserted:
+        db.session.commit()
+        print(f"Seeded {inserted} missing foods from {csv_path}.")
+    else:
+        print(f"Foods table already has all CSV seed items ({len(existing_ids)} items).")
+
+
 def init_db(app):
     """
     Initializes the database:
@@ -95,38 +140,6 @@ def init_db(app):
             else:
                 print("Skipping admin seed; set ADMIN_USERNAME and ADMIN_PASSWORD to create one.")
             
-        # Check if foods table is empty and seed from datasets/foods.csv
-        food_count = Food.query.count()
-        if food_count == 0:
-            csv_path = os.path.join(app.root_path, 'datasets', 'foods.csv')
-            if os.path.exists(csv_path):
-                print(f"Seeding foods from {csv_path}...")
-                with open(csv_path, mode='r', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        # Clean up values
-                        food = Food(
-                            food_id=row['food_id'],
-                            food_name=row['food_name'],
-                            cuisine=row['cuisine'],
-                            category=row['category'],
-                            calories=int(row['calories']),
-                            protein=float(row['protein']),
-                            carbs=float(row['carbs']),
-                            fats=float(row['fats']),
-                            spice_level=row['spice_level'],
-                            veg_nonveg=row['veg_nonveg'],
-                            price=float(row['price']),
-                            meal_type=row.get('meal_type', 'Heavy'),
-                            image_url=row.get('image_url', ''),
-                            description=row.get('description', ''),
-                            ingredients=row.get('ingredients', ''),
-                            allergens=row.get('allergens', ''),
-                        )
-                        db.session.add(food)
-                db.session.commit()
-                print(f"Successfully seeded {Food.query.count()} foods.")
-            else:
-                print(f"Warning: datasets/foods.csv not found at {csv_path}. Skipping food seeding.")
-        else:
-            print(f"Foods table already seeded with {food_count} items.")
+        # Seed any CSV foods that are not already present. Existing rows are
+        # left untouched so admin edits are not overwritten on startup.
+        _seed_missing_foods_from_csv(app)
