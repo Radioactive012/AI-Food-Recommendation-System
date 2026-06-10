@@ -143,9 +143,9 @@
     <div class="section-heading split">
         <div>
             <h2>Featured Dishes</h2>
-            <p>A quick look at dishes already in your catalogue.</p>
+            <p>A quick look at {{ catalog_count }} dishes already in your catalogue.</p>
         </div>
-        <a href="{{ url_for('history') }}">View Hitlist</a>
+        <a href="{{ url_for('catalog') }}">View Full Catalogue</a>
     </div>
     <div class="dish-grid">
         {% for food in featured_foods %}
@@ -154,7 +154,7 @@
                     {% if food.image_url %}
                         <img src="{{ food.image_url }}" alt="{{ food.food_name }}" loading="lazy">
                     {% else %}
-                        <span class="material-symbols-outlined">restaurant</span>
+                        <img src="{{ url_for('food_image', food_id=food.food_id) }}" alt="{{ food.food_name }}" loading="lazy">
                     {% endif %}
                 </a>
                 <div class="dish-body">

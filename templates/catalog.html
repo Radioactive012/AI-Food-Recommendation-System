@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Urban Diner - Catalogue{% endblock %}
+
+{% block content %}
+<section class="content-section catalog-hero">
+    <div class="section-heading split">
+        <div>
+            <span class="section-kicker">Full food catalogue</span>
+            <h1>Browse all {{ total_foods }} dishes</h1>
+            <p>Explore every dish available to recommendations, meal plans, nutrition charts, and grocery lists.</p>
+        </div>
+        <a href="{{ url_for('index') }}" class="secondary-cta cta-compact">
+            <span class="material-symbols-outlined">tune</span>
+            Get Recommendations
+        </a>
+    </div>
+</section>
+
+<section class="content-section catalog-toolbar">
+    <form action="{{ url_for('catalog') }}" method="GET" class="catalog-filter-form">
+        <label class="catalog-search">
+            <span class="material-symbols-outlined">search</span>
+            <input type="search" name="q" value="{{ filters.q }}" placeholder="Search dish, ingredient, or goal...">
+        </label>
+
+        <select name="cuisine" class="form-input" aria-label="Cuisine">
+            <option value="">All cuisines</option>
+            {% for cuisine in cuisines %}
+                <option value="{{ cuisine }}" {% if filters.cuisine == cuisine %}selected{% endif %}>{{ cuisine }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="category" class="form-input" aria-label="Category">
+            <option value="">All meals</option>
+            {% for category in categories %}
+                <option value="{{ category }}" {% if filters.category == category %}selected{% endif %}>{{ category }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="diet" class="form-input" aria-label="Diet">
+            <option value="">All diets</option>
+            {% for diet in diets %}
+                <option value="{{ diet }}" {% if filters.diet == diet %}selected{% endif %}>{{ diet }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="spice" class="form-input" aria-label="Spice level">
+            <option value="">All spice</option>
+            {% for spice in spice_levels %}
+                <option value="{{ spice }}" {% if filters.spice == spice %}selected{% endif %}>{{ spice }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="primary-cta cta-compact">
+            <span class="material-symbols-outlined">filter_alt</span>
+            Filter
+        </button>
+        <a href="{{ url_for('catalog') }}" class="secondary-cta cta-compact">Clear</a>
+    </form>
+</section>
+
+<section class="content-section">
+    <div class="section-heading split">
+        <div>
+            <h2>{{ foods|length }} dish{% if foods|length != 1 %}es{% endif %} showing</h2>
+            <p>All cards below are loaded from the active food database.</p>
+        </div>
+    </div>
+
+    {% if foods %}
+        <div class="dish-grid catalog-grid">
+            {% for food in foods %}
+                <article class="dish-card catalog-card">
+                    <button class="save-button" type="button" title="Save to hitlist" data-food-id="{{ food.food_id }}">
+                        <span class="material-symbols-outlined">favorite</span>
+                    </button>
+                    <a href="{{ url_for('direct_food_info') }}?food_id={{ food.food_id }}" class="dish-image">
+                        {% if food.image_url %}
+                            <img src="{{ food.image_url }}" alt="{{ food.food_name }}" loading="lazy">
+                        {% else %}
+                            <img src="{{ url_for('food_image', food_id=food.food_id) }}" alt="{{ food.food_name }}" loading="lazy">
+                        {% endif %}
+                    </a>
+                    <div class="dish-body">
+                        <div class="dish-title-row">
+                            <h3>{{ food.food_name }}</h3>
+                            <span>₹{{ food.price | int }}</span>
+                        </div>
+                        <p class="meta-line">
+                            <span class="material-symbols-outlined">restaurant</span>
+                            {{ food.cuisine }}
+                            <span>·</span>
+                            {{ food.category }}
+                            <span>·</span>
+                            {{ food.veg_nonveg }}
+                        </p>
+                        <p>{{ food.description }}</p>
+                        <div class="tag-row">
+                            <span>{{ food.spice_level }} spice</span>
+                            <span>{{ food.meal_type }}</span>
+                            <span>{{ food.calories }} kcal</span>
+                        </div>
+                        <div class="nutrition-row">
+                            <div><strong>{{ food.protein | round | int }}g</strong><span>Protein</span></div>
+                            <div><strong>{{ food.carbs | round | int }}g</strong><span>Carbs</span></div>
+                            <div><strong>{{ food.fats | round | int }}g</strong><span>Fats</span></div>
+                        </div>
+                        {% if food.allergens %}
+                            <div class="tag-row allergen-tags">
+                                {% for allergen in food.allergens.replace('|', ',').split(',') %}
+                                    {% if allergen.strip() %}
+                                        <span class="allergen-tag">{{ allergen.strip() }}</span>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <span class="material-symbols-outlined">search_off</span>
+            <h2>No dishes found</h2>
+            <p>Try clearing filters or searching for a broader ingredient, cuisine, or meal type.</p>
+            <a href="{{ url_for('catalog') }}" class="primary-cta">Show All Dishes</a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,28 +1,67 @@
 import os
 import csv
 from werkzeug.security import generate_password_hash
-from sqlalchemy import inspect, text
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, inspect, text
 from models.models import db, Food, Admin
 import uuid
 
 
+def _add_missing_columns(table_name, columns):
+    inspector = inspect(db.engine)
+    if table_name not in inspector.get_table_names():
+        return
+
+    existing_columns = {column['name'] for column in inspector.get_columns(table_name)}
+    dialect = db.engine.dialect
+    preparer = dialect.identifier_preparer
+    changed = False
+
+    for column_name, column_type, options in columns:
+        if column_name in existing_columns:
+            continue
+
+        column_type_sql = column_type.compile(dialect=dialect)
+        statement = (
+            f"ALTER TABLE {preparer.quote(table_name)} "
+            f"ADD COLUMN {preparer.quote(column_name)} {column_type_sql}"
+        )
+        if options:
+            statement += f" {options}"
+        db.session.execute(text(statement))
+        changed = True
+
+    if changed:
+        db.session.commit()
+
+
 def _migrate_schema():
     """Add new columns to existing SQLite tables when needed."""
-    inspector = inspect(db.engine)
-    if 'users' in inspector.get_table_names():
-        user_columns = {column['name'] for column in inspector.get_columns('users')}
-        if 'learned_prefs' not in user_columns:
-            db.session.execute(text('ALTER TABLE users ADD COLUMN learned_prefs TEXT'))
-            db.session.commit()
-        if 'is_verified' not in user_columns:
-            db.session.execute(text('ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT 0 NOT NULL'))
-            db.session.commit()
-        if 'otp_code' not in user_columns:
-            db.session.execute(text('ALTER TABLE users ADD COLUMN otp_code VARCHAR(6)'))
-            db.session.commit()
-        if 'otp_expiry' not in user_columns:
-            db.session.execute(text('ALTER TABLE users ADD COLUMN otp_expiry DATETIME'))
-            db.session.commit()
+    _add_missing_columns('users', [
+        ('learned_prefs', Text(), ''),
+        ('is_verified', Boolean(), 'DEFAULT FALSE NOT NULL'),
+        ('otp_code', String(6), ''),
+        ('otp_expiry', DateTime(), ''),
+    ])
+    _add_missing_columns('foods', [
+        ('meal_type', String(20), ''),
+        ('image_url', String(255), ''),
+        ('description', Text(), ''),
+        ('ingredients', Text(), ''),
+        ('allergens', Text(), ''),
+    ])
+    _add_missing_columns('ratings', [
+        ('review', Text(), ''),
+        ('created_at', DateTime(), 'DEFAULT CURRENT_TIMESTAMP'),
+    ])
+    _add_missing_columns('meal_plans', [
+        ('session_id', String(64), ''),
+        ('plan_name', String(100), "DEFAULT 'My Meal Plan'"),
+        ('created_at', DateTime(), 'DEFAULT CURRENT_TIMESTAMP'),
+    ])
+    _add_missing_columns('meal_plan_items', [
+        ('day_index', Integer(), ''),
+        ('slot', String(20), ''),
+    ])
 
 
 def init_db(app):

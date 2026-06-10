@@ -111,6 +111,16 @@
                 <label for="description">Detailed Description</label>
                 <textarea id="admin_description" name="description" class="form-input" rows="3" placeholder="Explain the ingredients, nutritional balance, or taste profiles..." required></textarea>
             </div>
+
+            <div class="form-group full-width">
+                <label for="ingredients">Ingredients</label>
+                <textarea id="admin_ingredients" name="ingredients" class="form-input" rows="2" placeholder="Comma-separated, e.g. paneer,yogurt,bell pepper,cumin"></textarea>
+            </div>
+
+            <div class="form-group full-width">
+                <label for="allergens">Allergens</label>
+                <input type="text" id="admin_allergens" name="allergens" class="form-input" placeholder="Pipe-separated, e.g. Dairy|Nuts">
+            </div>
             
             <div class="form-group full-width form-action-row">
                 <button type="submit" class="submit-btn form-submit-btn">
@@ -198,6 +208,8 @@
         document.getElementById('admin_fats').value = food.fats;
         document.getElementById('admin_image_url').value = food.image_url || '';
         document.getElementById('admin_description').value = food.description || '';
+        document.getElementById('admin_ingredients').value = food.ingredients || '';
+        document.getElementById('admin_allergens').value = food.allergens || '';
         
         // Show Cancel button and modify action text
         document.getElementById('formSubmitText').textContent = "Update Food Item";

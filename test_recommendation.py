@@ -310,6 +310,22 @@ class FlaskRouteTestCase(unittest.TestCase):
         self.assertIn('Veg Spicy Dinner Bowl', body)
         self.assertNotIn('Chicken Biryani', body)
 
+    def test_catalog_lists_foods_and_filters_by_cuisine(self):
+        response = self.client.get('/catalog')
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Browse all 4 dishes', body)
+        self.assertIn('Veg Spicy Dinner Bowl', body)
+        self.assertIn('Chicken Protein Wrap', body)
+
+        filtered = self.client.get('/catalog?cuisine=American&diet=Veg')
+        filtered_body = filtered.get_data(as_text=True)
+
+        self.assertEqual(filtered.status_code, 200)
+        self.assertIn('Protein Salad', filtered_body)
+        self.assertNotIn('Veg Spicy Dinner Bowl', filtered_body)
+
     def test_invalid_ratings_return_400_for_json(self):
         for rating in ['abc', '0', '6']:
             response = self.client.post('/submit-rating', json={
@@ -365,6 +381,8 @@ class FlaskRouteTestCase(unittest.TestCase):
             'fats': '7',
             'image_url': '',
             'description': 'A test taco.',
+            'ingredients': 'corn tortilla,beans,tomato',
+            'allergens': 'Gluten',
         })
         self.assertEqual(create.status_code, 302)
 
@@ -372,6 +390,8 @@ class FlaskRouteTestCase(unittest.TestCase):
             food = Food.query.filter_by(food_name='Test Taco').first()
             self.assertIsNotNone(food)
             food_id = food.food_id
+            self.assertEqual(food.ingredients, 'corn tortilla,beans,tomato')
+            self.assertEqual(food.allergens, 'Gluten')
 
         update = self.client.post('/admin/save', data={
             'food_id': food_id,
@@ -395,6 +415,8 @@ class FlaskRouteTestCase(unittest.TestCase):
             updated = db.session.get(Food, food_id)
             self.assertEqual(updated.food_name, 'Updated Taco')
             self.assertEqual(updated.category, 'Dinner')
+            self.assertEqual(updated.ingredients, 'corn tortilla,beans,tomato')
+            self.assertEqual(updated.allergens, 'Gluten')
 
         delete = self.client.post(f'/admin/delete/{food_id}')
         self.assertEqual(delete.status_code, 302)
@@ -499,6 +521,63 @@ class FlaskRouteTestCase(unittest.TestCase):
         self.assertEqual(call_kwargs['json']['reasoning'], {'exclude': True})
         self.assertEqual(call_kwargs['headers']['Authorization'], 'Bearer test-openrouter-key')
         self.assertEqual(call_kwargs['timeout'], 65)
+
+    def test_learn_preference_defensive(self):
+        # Trigger learn_preference in request context
+        with app.test_request_context():
+            from flask import session
+            session['learned_prefs'] = {'cuisines': {}}
+            from app import learn_preference
+            with app.app_context():
+                food = Food.query.first()
+                self.assertIsNotNone(food)
+                learn_preference(food)
+            self.assertIn('diet_counts', session['learned_prefs'])
+            self.assertIn('categories', session['learned_prefs'])
+
+    def test_nlp_parser_constraint_stripping(self):
+        from ml.similarity_model import parse_natural_language_search
+        # Test query with both calories and budget
+        constraints = parse_natural_language_search("suggest lunch under 300 calories and under 200 rupees")
+        self.assertEqual(constraints.get('max_calories'), 300)
+        self.assertEqual(constraints.get('max_budget'), 200.0)
+
+    def test_vegan_diet_constraint_filtering(self):
+        from ml.similarity_model import apply_nl_constraints
+        with app.app_context():
+            foods = Food.query.all()
+            constraints = {'diet': 'Vegan'}
+            filtered = apply_nl_constraints(foods, constraints)
+            for f in filtered:
+                self.assertEqual(f.veg_nonveg, 'Veg')
+                self.assertNotIn('chicken', f.food_name.lower())
+                self.assertNotIn('milk', (f.description or "").lower())
+
+    def test_health_keyword_override_mapping(self):
+        response = self.client.post('/recommendations', data={
+            'search_query': 'suggest a high protein lunch under 400',
+            'diet': 'Veg',
+            'spice': 'Medium',
+            'health_goal': 'Healthy Eating',
+            'mood': 'Neutral',
+            'budget': '1000',
+        })
+        body = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Protein Salad', body)
+
+    def test_cf_rating_parse_safety(self):
+        from ml.similarity_model import RecommendationEngine
+        engine = RecommendationEngine()
+        class FakeRating:
+            def __init__(self, food_id, rating):
+                self.food_id = food_id
+                self.rating = rating
+        rating_history = [FakeRating('veg_spicy_dinner', 'invalid_rating'), FakeRating('chicken_biryani', '5')]
+        with app.app_context():
+            foods = Food.query.all()
+            scores = engine._collaborative_filtering_scores(rating_history, foods, foods)
+            self.assertIsNotNone(scores)
 
 
 class AuthAndProfileTestCase(unittest.TestCase):

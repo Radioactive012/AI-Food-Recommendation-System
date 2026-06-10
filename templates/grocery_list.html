@@ -31,10 +31,16 @@
             <h2 id="groceryTitle">Shopping List</h2>
             <p id="grocerySubtitle"></p>
         </div>
-        <button type="button" class="secondary-cta cta-compact" id="printGroceryBtn" onclick="window.print()">
-            <span class="material-symbols-outlined">print</span>
-            Print
-        </button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="secondary-cta cta-compact" id="printGroceryBtn" onclick="window.print()">
+                <span class="material-symbols-outlined">print</span>
+                Print
+            </button>
+            <button type="button" class="secondary-cta cta-compact" id="exportGroceryBtn">
+                <span class="material-symbols-outlined">download</span>
+                Export Text
+            </button>
+        </div>
     </div>
     <div id="groceryGrid" class="grocery-grid"></div>
 </section>
@@ -48,6 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const groceryBtn = document.getElementById('generateGroceryBtn');
     const groceryFeedback = document.getElementById('groceryFeedback');
     const groceryBtnDefault = groceryBtn.innerHTML;
+    let lastGroceryData = null;
 
     function showGroceryFeedback(message) {
         groceryFeedback.textContent = message;
@@ -122,6 +129,7 @@ document.addEventListener('DOMContentLoaded', function() {
             groceryBtn.innerHTML = groceryBtnDefault;
             if (data.status === 'success') {
                 clearGroceryFeedback();
+                lastGroceryData = data;
                 renderGroceryList(data);
                 document.getElementById('groceryResults').style.display = '';
                 document.getElementById('groceryResults').scrollIntoView({behavior: 'smooth'});
@@ -133,6 +141,41 @@ document.addEventListener('DOMContentLoaded', function() {
             groceryBtn.disabled = false;
             groceryBtn.innerHTML = groceryBtnDefault;
             showGroceryFeedback('Could not generate a shopping list right now. Please try again.');
+        });
+    }
+
+    const exportBtn = document.getElementById('exportGroceryBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function() {
+            if (!lastGroceryData) return;
+            let text = "=========================================\n";
+            text += "      URBAN DINER SHOPPING LIST\n";
+            text += "=========================================\n";
+            text += `Generated on: ${new Date().toLocaleDateString()}\n`;
+            text += `Summary: ${lastGroceryData.total_items} ingredients from ${lastGroceryData.foods_count} dishes\n`;
+            text += "-----------------------------------------\n\n";
+
+            const categories = lastGroceryData.grocery_list;
+            for (const [category, items] of Object.entries(categories)) {
+                if (items.length === 0) continue;
+                text += `[${category.toUpperCase()}]\n`;
+                items.forEach(item => {
+                    text += `[ ] ${item.name} (Used in: ${item.foods.join(', ')})\n`;
+                });
+                text += "\n";
+            }
+            text += "=========================================\n";
+
+            // Trigger file download
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `urban_diner_grocery_list_${new Date().toISOString().slice(0, 10)}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         });
     }
 

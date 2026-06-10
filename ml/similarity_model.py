@@ -40,7 +40,10 @@ class RecommendationEngine:
         # 1. PHASE 1: Rule-Based Filtering
         filtered_foods = []
         user_diet = user_profile.get('diet_type', 'Veg') # Default to Veg for safety
-        user_budget = float(user_profile.get('budget', 1000))
+        try:
+            user_budget = float(user_profile.get('budget', 1000) or 1000)
+        except (ValueError, TypeError):
+            user_budget = 1000.0
         
         for food in all_foods:
             # Rule: Strict Budget Limit
@@ -80,7 +83,10 @@ class RecommendationEngine:
         user_spice = user_profile.get('spice_preference')
         user_health = user_profile.get('health_goal')
         user_mood = user_profile.get('mood_preference')
-        user_budget = float(user_profile.get('budget', 1000))
+        try:
+            user_budget = float(user_profile.get('budget', 1000) or 1000)
+        except (ValueError, TypeError):
+            user_budget = 1000.0
         
         # 3. PHASE 3: Content-Based Filtering (TF-IDF + Cosine Similarity)
         # Create user preference query string
@@ -112,7 +118,7 @@ class RecommendationEngine:
         ml_model = None
         if rating_history and len(rating_history) >= 5:
             # We have enough ratings to try to load or train a predictor
-            ml_model = self._train_or_load_ml_model(rating_history, all_foods)
+            ml_model = self._train_or_load_ml_model(rating_history, all_foods, user_profile=user_profile)
 
         # Iterate and compile scores
         for idx, food in enumerate(filtered_foods):
@@ -253,7 +259,13 @@ class RecommendationEngine:
         if not rating_history:
             return cf_scores
 
-        liked_ids = {r.food_id for r in rating_history if r.rating >= 4}
+        liked_ids = set()
+        for r in rating_history:
+            try:
+                if int(r.rating) >= 4:
+                    liked_ids.add(r.food_id)
+            except (ValueError, TypeError):
+                continue
         rated_ids = {r.food_id for r in rating_history}
         if not liked_ids:
             return cf_scores
@@ -299,7 +311,7 @@ class RecommendationEngine:
 
         return cf_scores
 
-    def _train_or_load_ml_model(self, rating_history, all_foods):
+    def _train_or_load_ml_model(self, rating_history, all_foods, user_profile=None):
         """
         Helper to train a Random Forest model using the user ratings history.
         """
@@ -311,9 +323,19 @@ class RecommendationEngine:
                 food_item = next((f for f in all_foods if f.food_id == r.food_id), None)
                 if not food_item:
                     continue
+                try:
+                    r_val = float(r.rating)
+                except (ValueError, TypeError):
+                    continue
+                user_age = 25
+                if user_profile:
+                    try:
+                        user_age = int(user_profile.get('age', 25) or 25)
+                    except (ValueError, TypeError):
+                        pass
                 # Compile feature vector
                 row = {
-                    'rating': r.rating,
+                    'rating': r_val,
                     # Food Features
                     'calories': food_item.calories,
                     'protein': food_item.protein,
@@ -322,7 +344,7 @@ class RecommendationEngine:
                     'price': food_item.price,
                     'veg_nonveg': 1 if food_item.veg_nonveg == 'Veg' else 0,
                     # User features from rating context or generic
-                    'user_age': 25, # default fallback
+                    'user_age': user_age,
                 }
                 rows.append(row)
                 
@@ -501,16 +523,19 @@ def parse_natural_language_search(query):
     cal_match = re.search(r'(?:under|below|less than|max(?:imum)?)\s*(\d+)\s*(?:cal|kcal|calories)', query_lower)
     if cal_match:
         constraints['max_calories'] = int(cal_match.group(1))
+        query_lower = query_lower.replace(cal_match.group(0), "")
 
     # Protein constraint
     prot_match = re.search(r'(?:at least|min(?:imum)?|over|more than)\s*(\d+)\s*(?:g|gram)?\s*protein', query_lower)
     if prot_match:
         constraints['min_protein'] = int(prot_match.group(1))
+        query_lower = query_lower.replace(prot_match.group(0), "")
 
     # Budget constraint
     budget_match = re.search(r'(?:under|below|within|less than|max(?:imum)?|budget(?: of)?)\s*(?:rs\.?|₹)?\s*(\d+(?:\.\d+)?)', query_lower)
-    if budget_match and 'max_calories' not in constraints:  # avoid double-matching calorie numbers
+    if budget_match:
         constraints['max_budget'] = float(budget_match.group(1))
+        query_lower = query_lower.replace(budget_match.group(0), "")
 
     # Spice level
     if any(term in query_lower for term in ['spicy', 'hot', 'fiery']):
@@ -546,6 +571,17 @@ def apply_nl_constraints(foods, constraints):
             filtered = [f for f in filtered if f.veg_nonveg == 'Veg']
         elif diet == 'Non-Veg':
             filtered = [f for f in filtered if f.veg_nonveg == 'Non-Veg']
+        elif diet == 'Vegan':
+            vegan_filtered = []
+            for f in filtered:
+                is_vegan = False
+                desc = (f.description or "").lower()
+                name = f.food_name.lower()
+                if f.veg_nonveg == 'Veg' and not any(x in name or x in desc for x in ['milk', 'cheese', 'paneer', 'egg', 'butter', 'ghee', 'cream', 'alfredo', 'mozzarella', 'pancake']):
+                    is_vegan = True
+                if is_vegan:
+                    vegan_filtered.append(f)
+            filtered = vegan_filtered
 
     if 'cuisine' in constraints:
         filtered = [f for f in filtered if f.cuisine.lower() == constraints['cuisine'].lower()]

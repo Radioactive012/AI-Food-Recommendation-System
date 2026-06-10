@@ -3,9 +3,10 @@ import re
 import concurrent.futures
 from functools import wraps
 from datetime import datetime, timedelta
+from html import escape
 import secrets
 from urllib.parse import urlsplit
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 from database.db_manager import init_db
@@ -52,6 +53,36 @@ def get_food(food_id):
     if not food_id:
         return None
     return db.session.get(Food, food_id)
+
+
+FOOD_IMAGE_THEMES = {
+    'Indian': {'bg': '#fff3df', 'accent': '#b35a1f', 'accent2': '#f1b24a', 'ink': '#3b1f0f'},
+    'Italian': {'bg': '#eef7ee', 'accent': '#2f7d4f', 'accent2': '#d84f36', 'ink': '#173522'},
+    'Chinese': {'bg': '#fff0ee', 'accent': '#b42828', 'accent2': '#f2bf4b', 'ink': '#3a1111'},
+    'American': {'bg': '#eef5ff', 'accent': '#245c9e', 'accent2': '#d84f36', 'ink': '#102a48'},
+    'Japanese': {'bg': '#f7f3ee', 'accent': '#111827', 'accent2': '#c03b3b', 'ink': '#1f2937'},
+    'Mexican': {'bg': '#f3f8e8', 'accent': '#2f7d4f', 'accent2': '#df7b24', 'ink': '#203615'},
+}
+
+
+def wrap_svg_text(text, max_chars=23, max_lines=2):
+    words = text.split()
+    lines = []
+    current = ''
+    for word in words:
+        candidate = f'{current} {word}'.strip()
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip('.,') + '...'
+    return lines
 
 
 def get_user_allergies():
@@ -102,7 +133,16 @@ def get_food_vitamins(food):
 
 def learn_preference(food):
     """Track cuisine/category frequency for long-term preference learning."""
-    pref_data = session.get('learned_prefs', {'cuisines': {}, 'categories': {}, 'diet_counts': {}})
+    pref_data = session.get('learned_prefs')
+    if not isinstance(pref_data, dict):
+        pref_data = {'cuisines': {}, 'categories': {}, 'diet_counts': {}}
+    else:
+        if 'cuisines' not in pref_data:
+            pref_data['cuisines'] = {}
+        if 'categories' not in pref_data:
+            pref_data['categories'] = {}
+        if 'diet_counts' not in pref_data:
+            pref_data['diet_counts'] = {}
     cuisine = food.cuisine
     category = food.category
     diet = food.veg_nonveg
@@ -301,6 +341,59 @@ def generate_otp():
 def favicon():
     return redirect(url_for('static', filename='favicon.svg'))
 
+
+@app.route('/food-image/<food_id>.svg')
+def food_image(food_id):
+    food = get_food(food_id)
+    if not food:
+        return Response(status=404)
+
+    theme = FOOD_IMAGE_THEMES.get(food.cuisine, FOOD_IMAGE_THEMES['Indian'])
+    name_lines = wrap_svg_text(food.food_name)
+    ingredient = (food.ingredients or food.description or food.cuisine).split(',')[0].strip()
+    ingredient = ingredient.title() if ingredient else food.cuisine
+    name_tspans = ''.join(
+        f'<tspan x="300" dy="{0 if index == 0 else 44}">{escape(line)}</tspan>'
+        for index, line in enumerate(name_lines)
+    )
+    subtitle = f'{food.cuisine} • {food.category} • {food.veg_nonveg}'
+    macro_line = f'{food.calories} kcal • {round(food.protein)}g protein • ₹{int(food.price)}'
+    spice_line = f'{food.spice_level} spice • {food.meal_type}'
+
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" role="img" aria-label="{escape(food.food_name)}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="{theme['bg']}"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#1f2a24" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="600" height="400" fill="url(#bg)"/>
+  <circle cx="104" cy="76" r="70" fill="{theme['accent2']}" opacity="0.20"/>
+  <circle cx="518" cy="324" r="94" fill="{theme['accent']}" opacity="0.12"/>
+  <g filter="url(#shadow)">
+    <ellipse cx="300" cy="196" rx="146" ry="98" fill="#ffffff"/>
+    <ellipse cx="300" cy="196" rx="110" ry="68" fill="{theme['bg']}" stroke="{theme['accent']}" stroke-width="5"/>
+    <circle cx="260" cy="176" r="28" fill="{theme['accent2']}"/>
+    <circle cx="318" cy="204" r="34" fill="{theme['accent']}" opacity="0.90"/>
+    <path d="M347 164c31 8 52 27 55 50-33 8-65-2-86-26 7-14 17-22 31-24z" fill="{theme['accent2']}" opacity="0.86"/>
+    <path d="M202 220c39 28 122 40 194 8" fill="none" stroke="{theme['accent']}" stroke-width="10" stroke-linecap="round" opacity="0.22"/>
+  </g>
+  <rect x="32" y="30" width="166" height="38" rx="19" fill="{theme['accent']}" opacity="0.96"/>
+  <text x="115" y="55" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="800" fill="#ffffff">{escape(food.cuisine)}</text>
+  <text x="300" y="88" text-anchor="middle" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="15" font-weight="800" fill="{theme['accent']}">{escape(subtitle)}</text>
+  <text x="300" y="270" text-anchor="middle" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="37" font-weight="900" fill="{theme['ink']}">{name_tspans}</text>
+  <text x="300" y="338" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="800" fill="{theme['accent']}">{escape(ingredient)}</text>
+  <text x="300" y="365" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="{theme['ink']}" opacity="0.78">{escape(macro_line)}</text>
+  <text x="300" y="386" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="{theme['ink']}" opacity="0.62">{escape(spice_line)}</text>
+</svg>'''
+
+    response = Response(svg, mimetype='image/svg+xml')
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
+
 @app.route('/')
 def index():
     # If the user has preferences saved in session, pass them.
@@ -315,8 +408,45 @@ def index():
     return render_template(
         'index.html',
         user_profile=user_profile,
-        featured_foods=foods[:3],
+        featured_foods=foods[:12],
+        catalog_count=len(foods),
         active_page='home'
+    )
+
+
+@app.route('/catalog')
+def catalog():
+    foods = get_foods()
+    filters = {
+        'q': request.args.get('q', '').strip(),
+        'cuisine': request.args.get('cuisine', '').strip(),
+        'category': request.args.get('category', '').strip(),
+        'diet': request.args.get('diet', '').strip(),
+        'spice': request.args.get('spice', '').strip(),
+    }
+
+    filtered_foods = foods
+    if filters['q']:
+        filtered_foods = [food for food in filtered_foods if food_matches_search(food, filters['q'])]
+    if filters['cuisine']:
+        filtered_foods = [food for food in filtered_foods if food.cuisine == filters['cuisine']]
+    if filters['category']:
+        filtered_foods = [food for food in filtered_foods if food.category == filters['category']]
+    if filters['diet']:
+        filtered_foods = [food for food in filtered_foods if food.veg_nonveg == filters['diet']]
+    if filters['spice']:
+        filtered_foods = [food for food in filtered_foods if food.spice_level == filters['spice']]
+
+    return render_template(
+        'catalog.html',
+        foods=filtered_foods,
+        total_foods=len(foods),
+        filters=filters,
+        cuisines=['Indian', 'Italian', 'Chinese', 'American', 'Japanese', 'Mexican'],
+        categories=['Breakfast', 'Lunch', 'Dinner', 'Snacks'],
+        diets=['Veg', 'Non-Veg'],
+        spice_levels=['Low', 'Medium', 'High'],
+        active_page='catalog'
     )
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -601,7 +731,11 @@ def get_recommendation_results():
     user_ratings = [SessionRating(r['food_id'], r['rating']) for r in session.get('ratings', [])]
     session_food_ids = {r.food_id for r in user_ratings}
     user_id = session.get('user_id')
+    user_age = 25
     if user_id:
+        user = db.session.get(User, user_id)
+        if user and user.age:
+            user_age = user.age
         for db_rating in Rating.query.filter_by(user_id=user_id).all():
             if db_rating.food_id not in session_food_ids:
                 user_ratings.append(SessionRating(db_rating.food_id, db_rating.rating))
@@ -616,7 +750,7 @@ def get_recommendation_results():
         'health_goal': health_goal,
         'mood_preference': mood,
         'budget': budget,
-        'age': 25
+        'age': user_age
     }
 
     # Try NL search first — if query looks like natural language
@@ -634,6 +768,18 @@ def get_recommendation_results():
                 user_profile['spice_preference'] = nl_constraints['spice']
             if 'max_budget' in nl_constraints:
                 user_profile['budget'] = nl_constraints['max_budget']
+            if 'health_keywords' in nl_constraints:
+                hk = nl_constraints['health_keywords']
+                if 'high_protein' in hk:
+                    user_profile['health_goal'] = 'Muscle Gain'
+                elif 'low_calorie' in hk:
+                    user_profile['health_goal'] = 'Weight Loss'
+                elif 'diabetes_friendly' in hk:
+                    user_profile['health_goal'] = 'Diabetes-Friendly'
+                elif 'heart_healthy' in hk:
+                    user_profile['health_goal'] = 'Heart-Healthy'
+                elif 'healthy' in hk:
+                    user_profile['health_goal'] = 'Healthy Eating'
 
     # Fallback: keyword search if NL didn't extract constraints or query is short
     if search_query and not nl_constraints:
@@ -646,7 +792,7 @@ def get_recommendation_results():
         user_profile=user_profile,
         all_foods=all_foods,
         rating_history=user_ratings,
-        limit=6,
+        limit=12,
         user_allergies=user_allergies,
         all_ratings=all_ratings,
     )
@@ -1261,8 +1407,10 @@ def admin_save_food():
     food.fats = fats
     food.image_url = required_text('image_url')
     food.description = description
-    food.ingredients = required_text('ingredients')
-    food.allergens = required_text('allergens')
+    if not food_id or 'ingredients' in request.form:
+        food.ingredients = required_text('ingredients')
+    if not food_id or 'allergens' in request.form:
+        food.allergens = required_text('allergens')
 
     if not food_id:
         db.session.add(food)

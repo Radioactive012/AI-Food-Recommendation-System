@@ -5,10 +5,27 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+
+def _is_production_env():
+    return (
+        os.environ.get('VERCEL') == '1'
+        or os.environ.get('FLASK_ENV') == 'production'
+        or os.environ.get('ENV') == 'production'
+        or os.environ.get('APP_ENV') == 'production'
+    )
+
+
+def _secret_key():
+    configured_key = os.environ.get('SECRET_KEY')
+    if configured_key:
+        return configured_key
+    if _is_production_env():
+        raise RuntimeError('SECRET_KEY must be set in production deployments.')
+    return secrets.token_urlsafe(32)
+
+
 class Config:
-    # Use SECRET_KEY in production. The generated fallback keeps local demos working
-    # without committing a reusable session-signing secret.
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-urban-diner-12345'
+    SECRET_KEY = _secret_key()
     
     # Database Configuration
     # Fallback to SQLite if DATABASE_URL is not provided or empty

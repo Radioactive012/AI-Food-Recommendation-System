@@ -59,10 +59,10 @@
                             <span class="material-symbols-outlined">favorite</span>
                         </button>
                         <a href="{{ url_for('direct_food_info') }}?food_id={{ food.food_id }}" class="dish-image">
-                            {% if food.image_url and food.image_url.startswith('http') %}
+                            {% if food.image_url %}
                                 <img src="{{ food.image_url }}" alt="{{ food.food_name }}" loading="lazy">
                             {% else %}
-                                <span class="material-symbols-outlined">restaurant</span>
+                                <img src="{{ url_for('food_image', food_id=food.food_id) }}" alt="{{ food.food_name }}" loading="lazy">
                             {% endif %}
                             <span class="match-chip">
                                 {% set pct = (((score + 5) / 25) * 100) | round | int %}

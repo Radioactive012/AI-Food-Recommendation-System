@@ -25,6 +25,7 @@
             </button>
             <nav class="desktop-nav" id="siteNav" aria-label="Primary">
                 <a href="{{ url_for('index') }}" class="nav-link {% if active_page == 'home' %}active{% endif %}">Discover</a>
+                <a href="{{ url_for('catalog') }}" class="nav-link {% if active_page == 'catalog' %}active{% endif %}">Catalogue</a>
                 <a href="{{ url_for('nutrition_dashboard') }}" class="nav-link {% if active_page == 'nutrition' %}active{% endif %}">Nutrition</a>
                 <a href="{{ url_for('meal_planner') }}" class="nav-link {% if active_page == 'meal_planner' %}active{% endif %}">Meal Planner</a>
                 <a href="{{ url_for('grocery_list_page') }}" class="nav-link {% if active_page == 'grocery' %}active{% endif %}">Grocery</a>
@@ -84,6 +85,7 @@
             </div>
             <nav class="footer-nav" aria-label="Footer">
                 <a href="{{ url_for('index') }}">Discover</a>
+                <a href="{{ url_for('catalog') }}">Catalogue</a>
                 <a href="{{ url_for('nutrition_dashboard') }}">Nutrition</a>
                 <a href="{{ url_for('meal_planner') }}">Meal Planner</a>
                 <a href="{{ url_for('grocery_list_page') }}">Grocery List</a>

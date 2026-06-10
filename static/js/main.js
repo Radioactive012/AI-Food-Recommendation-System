@@ -192,4 +192,19 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => msg.remove(), 400);
         }, 5000);
     });
+
+    // 7. Interactive selection for allergy chips (Taste Profile checkboxes)
+    const allergyCheckboxes = document.querySelectorAll('.allergy-check-label input[type="checkbox"]');
+    allergyCheckboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            const parent = this.closest('.allergy-check-label');
+            if (parent) {
+                if (this.checked) {
+                    parent.classList.add('selected');
+                } else {
+                    parent.classList.remove('selected');
+                }
+            }
+        });
+    });
 });
